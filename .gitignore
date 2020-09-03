@@ -1,0 +1,9 @@
+# Exclude misc
+.spyproject
+__pycache__
+
+# Exclude folder
+projects
+archive
+docs/
+components/heat_sector

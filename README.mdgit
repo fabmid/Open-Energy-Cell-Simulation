@@ -1,0 +1,1 @@
+"# Open-Energy-Cell-Simulation"  initgit add README.mdgit commit -m "first commit"git branch -M mastergit remote add origin git@github.com:fabmid/Open-Energy-Cell-Simulation.gitgit push -u origin master                
