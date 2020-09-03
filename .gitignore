@@ -5,5 +5,7 @@ __pycache__
 # Exclude folder
 projects
 archive
-docs/
+docs/API_documentation_OpEnCellS_Sphinx
+docs/Documentation_OpEnCellS
+docs/Documentation_other technical
 components/heat_sector
