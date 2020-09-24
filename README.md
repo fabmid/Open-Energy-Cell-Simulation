@@ -24,4 +24,3 @@ Models of heat sector components involve solarthermal collectors, pipes and stra
 To Dos
 ------
  * Include Installation instructions in file with command "pip install module" or list of necessary external libaries.
- * Include good workflow for sensitivity analysis.
