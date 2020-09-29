@@ -7,7 +7,7 @@ The tool is written in Python and follows an object-oriented modeling approach.
 OpEnCellS
 ---------
 OpEnCellS enables a detailed powerflow simulation of various renewable energy technologies with a temporal resolution of one minute or one hour.
-Electricity sector components involves models for:
+Electricity sector components involve models for:
 
  * Photovoltaic
  * Power components
@@ -19,8 +19,5 @@ Power component technologies can be:
  * Battery Management Systems (BMS)
  * Power inverters
 
-Models of heat sector components involve solarthermal collectors, pipes and stratified heat storages, which are currently under development.
 
-To Dos
-------
- * Include Installation instructions in file with command "pip install module" or list of necessary external libaries.
+
