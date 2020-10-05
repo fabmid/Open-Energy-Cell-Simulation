@@ -18,6 +18,9 @@ Power component technologies can be:
  * Maximum Power Point Tracker (MPPT) charge controller
  * Battery Management Systems (BMS)
  * Power inverters
+<<<<<<< Updated upstream
 
 
 
+=======
+>>>>>>> Stashed changes

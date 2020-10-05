@@ -1,10 +1,9 @@
 import pandas as pd
 from datetime import datetime
 import pvlib
-from simulatable import Simulatable
 import data_loader
 
-class Environment(Simulatable):
+class Environment():
     """Relevant methods for the calculation of the global irradiation and sun position.
 
     Parameters
@@ -19,21 +18,18 @@ class Environment(Simulatable):
     Note
     ----
     - System orientation (tuble of floats)
-        - 1. tuble entry system azimuth in degrees [°] (180°=north, 0°=south, 270°=east, 90°west).
-        - 2. tuble entry system inclination in degrees [°].
+        - 1. tuble entry system azimuth in degrees [°]. Panel azimuth from north (0°=north, 90°=east, 180°=south, 270°=west).
+        - 2. tuble entry system inclination in degrees [°]. Panel tilt from horizontal.
     - System location (tuble of floats)
-        - 1. tuble entry system longitude in degrees [°].
-        - 2. tuble entry system latitude in degrees [°].        
+        - 1. tuble entry system longitude in degrees [°]. Positive east of prime meridian, negative west of prime meridian.
+        - 2. tuble entry system latitude in degrees [°]. Positive north of equator, negative south of equator.
     """
-
 
     def __init__(self,
                  timestep,
                  system_orientation,
                  system_location):
 
-        # Integrate simulatable class for time indexing
-        Simulatable.__init__(self)
         # Integrate irradiation and weather Data loader to load environmental data
         self.meteo_irradiation = data_loader.MeteoIrradiation()
         self.meteo_weather = data_loader.MeteoWeather()
@@ -104,8 +100,8 @@ class Environment(Simulatable):
         # List comprehension to get first timeindex of timestep
         self.time_index = [datetime.strptime(i.split('/')[0], '%Y-%m-%dT%H:%M:%S.%f') for i in self.time_step]
         # Load environmental values (Irradiation, temperature and windspeed)
+        self.sun_bni = pd.Series((self.meteo_irradiation.get_bni().values) / (self.timestep/3600), index=self.time_index)
         self.sun_ghi = pd.Series((self.meteo_irradiation.get_ghi().values) / (self.timestep/3600), index=self.time_index)
-        self.sun_bhi = pd.Series((self.meteo_irradiation.get_bhi().values) / (self.timestep/3600), index=self.time_index)
         self.sun_dhi = pd.Series((self.meteo_irradiation.get_dhi().values) / (self.timestep/3600), index=self.time_index)
 
         self.temperature_ambient = pd.Series(self.meteo_weather.get_temperature().values, index=self.time_index)
@@ -114,20 +110,31 @@ class Environment(Simulatable):
         # pvlib: Calculate sun position
         self.sun_position_pvlib = pvlib.solarposition.get_solarposition(time=self.time_index,
                                                                         latitude=self.system_location.latitude,
-                                                                        longitude=self.system_location.longitude)
+                                                                        longitude=self.system_location.longitude,
+                                                                        altitude=self.system_location.altitude,
+                                                                        pressure=None,
+                                                                        method='nrel_numpy',
+                                                                        temperature=12)
 
         # pvlib: Calculate sun angle of incident
         self.sun_aoi_pvlib = pvlib.irradiance.aoi(surface_tilt=self.system_tilt,
                                                   surface_azimuth=self.system_azimuth,
-                                                  solar_zenith=self.sun_position_pvlib['elevation'],
+                                                  solar_zenith=self.sun_position_pvlib['apparent_zenith'],
                                                   solar_azimuth=self.sun_position_pvlib['azimuth'])
 
         # pvlib: Calculate plane of array irradiance (total, beam, sky, ground)
         self.sun_irradiance_pvlib = pvlib.irradiance.get_total_irradiance(surface_tilt=self.system_tilt,
-                                                                    surface_azimuth=self.system_azimuth,
-                                                                    solar_zenith=self.sun_position_pvlib['elevation'],
-                                                                    solar_azimuth=self.sun_position_pvlib['azimuth'],
-                                                                    dni=self.sun_bhi, ghi=self.sun_ghi, dhi=self.sun_dhi)
+                                                                          surface_azimuth=self.system_azimuth,
+                                                                          solar_zenith=self.sun_position_pvlib['apparent_zenith'],
+                                                                          solar_azimuth=self.sun_position_pvlib['azimuth'],
+                                                                          dni=self.sun_bni, 
+                                                                          ghi=self.sun_ghi, 
+                                                                          dhi=self.sun_dhi,
+                                                                          dni_extra=None,
+                                                                          airmass=None,
+                                                                          albedo=0.25,
+                                                                          surface_type=None,
+                                                                          model='isotropic')
         # extract global plane of array irradiance
         self.power = self.sun_irradiance_pvlib['poa_global']
         self.power_poa_direct = self.sun_irradiance_pvlib['poa_direct']

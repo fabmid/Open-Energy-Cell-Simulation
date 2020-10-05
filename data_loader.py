@@ -235,14 +235,40 @@ class LoadDemand(CSV):
     Returns
     -------
     day_profile : `pandas.series float`
-        [Wh] Pandas series of load profile sspecifies load demand per tiestep in watthours.
-
+        [Wh] Pandas series of daily load profile specifies load demand per timestep in watthours.
+    week_profile : `pandas.series float`
+        [Wh] Pandas series of weekly load profile specifies load demand per timestep in watthours.
+    year_profile : `pandas.series float`
+        [Wh] Pandas series of yearly load profile specifies load demand per timestep in watthours.
+    heating_profile : `pandas.series float`
+        [Wh] Pandas series of load profile specifies heating load demand per timestep in watthours.
+    hotwater_profile : `pandas.series float`
+        [Wh] Pandas series of load profile specifies hot water load demand per timestep in watthours.
     Note
     ----
     - Implemented method is usually integrated in load class to directly load load profile data.
+    - Heat load demand shall be placed in csv file with heating load in 0.column and hot water heat demand in 1.column.
+    - Electricty load demand is a single column csv file for a timeframe of a day, week or year.
     
     """
 
     def get_day_profile(self):
         """Returns day load profile"""
         return super().get_colomn(0)
+    
+    def get_week_profile(self):
+        """Returns day load profile"""
+        return super().get_colomn(0)
+    
+    def get_year_profile(self):
+        """Returns year load profile"""
+        return super().get_colomn(0)
+
+    def get_heating_profile(self):
+        """Returns year load profile"""
+        return super().get_colomn(0)
+
+    def get_hotwater_profile(self):
+        """Returns year load profile"""
+        return super().get_colomn(1)
+    

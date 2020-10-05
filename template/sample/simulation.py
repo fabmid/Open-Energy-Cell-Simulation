@@ -35,8 +35,8 @@ class Simulation(Simulatable):
         pv_peak_power : int. Installed phovoltaic peak power in Watt peak [Wp]
         battery capacity : int. Installed nominal battery capacity in Watthours [Wh]
         pv_orientation : tuble of floats. PV oriantation with:
-            1. tuble entry pv azimuth in degrees [°] (180°=north, 0°=south, 270°=east, 90°west)
-            2. tuble entry pv inclination in degrees [°]
+            1. tuble entry pv azimuth in degrees from north [°] (0°=north, 90°=east, 180°=south, 270°=west).
+            2. tuble entry pv inclination in degrees from horizontal [°]
         system_location : tuble of floats. System location coordinates:
             1. tuble entry system longitude in degrees [°]
             2. tuble entry system latitude in degrees [°]
@@ -52,10 +52,12 @@ class Simulation(Simulatable):
         # [Wh] Installed battery capacity
         self.battery_capacity = 600            
         #  PV orientation : tuble of floats. PV oriantation with:
-        # 1. pv azimuth in degrees [°] (180°=north, 0°=south, 270°=east, 90°west) & 2. pv inclination in degrees [°]
+        # 1. pv azimuth in degrees [°] (0°=north, 90°=east, 180°=south, 270°=west). & 2. pv inclination in degrees [°]
         self.pv_orientation = (0,0)
         
         # System location
+        # Latitude: Positive north of equator, negative south of equator.
+        # Longitude: Positive east of prime meridian, negative west of prime meridian.
         self.system_location = pvlib.location.Location(latitude=-3.386925,
                                                        longitude=36.682995,
                                                        tz='Africa/Dar_es_Salaam',

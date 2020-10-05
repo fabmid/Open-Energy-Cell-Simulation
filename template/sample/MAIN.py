@@ -36,6 +36,16 @@ sim.simulate()
 
  
 #%% Simulation results
+# Summarize environmental data
+results_env = pd.DataFrame(
+              data=OrderedDict({'sun_elevation':sim.env.sun_position_pvlib['elevation'],
+                                'sun_azimuth':sim.env.sun_position_pvlib['azimuth'],
+                                'sun_angle_of_incident':sim.env.sun_aoi_pvlib,                               
+                                'sun_ghi':sim.env.sun_ghi,
+                                'sun_dhi':sim.env.sun_dhi,
+                                'sun_bni':sim.env.sun_bni,
+                                'temperature_ambient':sim.env.temperature_ambient,
+                                'windspeed':sim.env.windspeed}), index=sim.timeindex)
 # Summarize power flows
 results_power = pd.DataFrame(
                 data=OrderedDict({'sun_power_poa_global':sim.env.sun_irradiance_pvlib['poa_global'],
