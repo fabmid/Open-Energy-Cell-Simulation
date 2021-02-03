@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from datetime import datetime
 import pvlib
 import data_loader
@@ -30,7 +31,8 @@ class Environment():
                  system_orientation,
                  system_location):
 
-        # Integrate irradiation and weather Data loader to load environmental data
+        ## Data loader
+        # Integrate irradiation and temperature/wind data loader for photovoltaic and windtubrine model
         self.meteo_irradiation = data_loader.MeteoIrradiation()
         self.meteo_weather = data_loader.MeteoWeather()
         
@@ -94,18 +96,26 @@ class Environment():
            for solar radiation applications. Solar Energy, vol. 81, no. 6, p. 838, 2007.
         .. [3]	NREL SPA code: http://rredc.nrel.gov/solar/codesandalgorithms/spa/
         """
-
-        ## Extract environment values with data_loader from csv file
+        
+        ## Time indexing
+        # Extract environment values with data_loader from csv file
         self.time_step = self.meteo_irradiation.get_time()
         # List comprehension to get first timeindex of timestep
         self.time_index = [datetime.strptime(i.split('/')[0], '%Y-%m-%dT%H:%M:%S.%f') for i in self.time_step]
+        
+        ## Wind turbine model
+        # Windspeed, temperature, pressure and roughness data
+        self.windspeed = pd.Series(self.meteo_weather.get_wind_speed().values, index=self.time_index)
+        self.temperature_ambient = pd.Series(self.meteo_weather.get_temperature().values, index=self.time_index)
+        self.air_pressure = pd.Series(self.meteo_weather.get_air_pressure().values, index=self.time_index)*100
+        # Fixed roughness length as long dataspource does not provide data
+        self.roughness_length = np.ones(len(self.windspeed))*0.1
+        
+        ## Photovoltaic Model: Irradiation, temperature, wind data       
         # Load environmental values (Irradiation, temperature and windspeed)
         self.sun_bni = pd.Series((self.meteo_irradiation.get_bni().values) / (self.timestep/3600), index=self.time_index)
         self.sun_ghi = pd.Series((self.meteo_irradiation.get_ghi().values) / (self.timestep/3600), index=self.time_index)
         self.sun_dhi = pd.Series((self.meteo_irradiation.get_dhi().values) / (self.timestep/3600), index=self.time_index)
-
-        self.temperature_ambient = pd.Series(self.meteo_weather.get_temperature().values, index=self.time_index)
-        self.windspeed = pd.Series(self.meteo_weather.get_wind_speed().values, index=self.time_index)
 
         # pvlib: Calculate sun position
         self.sun_position_pvlib = pvlib.solarposition.get_solarposition(time=self.time_index,
@@ -139,3 +149,16 @@ class Environment():
         self.power = self.sun_irradiance_pvlib['poa_global']
         self.power_poa_direct = self.sun_irradiance_pvlib['poa_direct']
         self.power_poa_diffuse = self.sun_irradiance_pvlib['poa_sky_diffuse']
+        
+        ## Create Wind data DataFrame multiindex for WindTurbine
+        # Needs to include wind_speed, temperature, pressure and roughness_length at given heights
+        arrays = [['wind_speed', 'temperature', 'pressure', 'roughness_length'], 
+                  [10, 2, 0,0]]
+        index=pd.MultiIndex.from_arrays(arrays, names=('name', 'value'))
+        
+        self.wind_data = pd.DataFrame({index[0]: self.windspeed, 
+                                       index[1]: self.temperature_ambient,
+                                       index[2]: self.air_pressure,
+                                       index[3]: self.roughness_length}
+                                      )
+        

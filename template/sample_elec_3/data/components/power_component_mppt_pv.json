@@ -1,0 +1,9 @@
+{
+    "specification": "MPPT_HQST_40A_12V_34V",
+    "efficiency_nominal": 0.951,
+    "voltage_loss": 0.009737,
+    "resistance_loss": 0.031432,
+    "power_self_consumption": 0.002671,
+    "end_of_life_power_components": 315360000,
+    "investment_costs_specific": 0.036
+}

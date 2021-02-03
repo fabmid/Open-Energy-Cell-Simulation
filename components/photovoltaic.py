@@ -55,7 +55,7 @@ class Photovoltaic(Serializable, Simulatable):
             self.params_R_s = 0.311962                                          # [Ohm] The series resistance at reference conditions
             self.params_pdc0 = 184.7016                                         # [W] Photovoltaic power of the modules at 1000 W/m2 and cell reference temperature
             self.params_gamma_pdc = -0.005                                      # [1/C] The temperature coefficient. Typically -0.002 to -0.005
-            self.degradation_pv = 1.58154e-10                                   # [1/s] Photovoltaic degradation per second: deg_yearly=0.5% --> (1+0.005)**(1/365*24*3600)-1
+            self.degradation_pv = 1.58154e-10                                   # [1/s] Photovoltaic degradation per second: deg_yearly=0.5% --> 0.005 / (8760*3600)
             self.investment_costs_specific = 0.8                                # [$/Wp] Photovoltaic specific investment costs
 
         # Integrate simulatable class for time indexing
@@ -114,7 +114,7 @@ class Photovoltaic(Serializable, Simulatable):
         if self.controller_type == 'mppt':
             self.photovoltaic_power_mppt()
         elif self.controller_type == 'pwm':
-            self.photovoltaic_power_pwm()
+            pass
         else:
             print('Specify valid pv controller type!')
 
@@ -165,10 +165,23 @@ class Photovoltaic(Serializable, Simulatable):
 
         # Photovoltaic cell temperature
         self.temperature = self.temperature_cell[self.time]
-        # Power calculation with aging
-        # Normalize power and multiplication with current peak power
-        self.power = (self.power_module[self.time] / self.params_pdc0) * self.peak_power_current
-
+        
+        # PWM power calculation
+        if self.controller_type == 'pwm':
+            self.photovoltaic_power_pwm()            
+            # Power calculation with aging
+            # Normalize power and multiplication with current peak power
+            self.power = (self.power_module / self.params_pdc0) * self.peak_power_current
+        
+        # MPPT power calculation    
+        elif self.controller_type == 'mppt':
+            # Power calculation with aging
+            # Normalize power and multiplication with current peak power
+            self.power = (self.power_module[self.time] / self.params_pdc0) * self.peak_power_current
+            
+        else:
+            print('Specify valid pv controller type!')
+            
         # Aging and State of Destruction
         self.photovoltaic_aging()
         self.photovoltaic_state_of_destruction()
@@ -267,8 +280,8 @@ class Photovoltaic(Serializable, Simulatable):
 
         # Call five parameter model
         [self.I_ph, self.I_sat, self.R_s, self.R_sh, self.nNsVth] = \
-        pvlib.pvsystem.calcparams_desoto(effective_irradiance=self.env.power,
-                                        temp_cell=(self.temperature_cell-273.15),
+        pvlib.pvsystem.calcparams_desoto(effective_irradiance=self.env.power[self.time],
+                                        temp_cell=(self.temperature-273.15),
                                         alpha_sc=self.params_alpha_sc,
                                         a_ref=self.params_a_ref,
                                         I_L_ref=self.params_I_L_ref,
@@ -281,7 +294,7 @@ class Photovoltaic(Serializable, Simulatable):
                                         temp_ref=25)
 
         # Define photovoltaic voltage
-        self.singlediode_voltage = self.params_V_mp_ref
+        self.singlediode_voltage = self.battery_voltage #self.params_V_mp_ref
         # Call single diode model
         self.singlediode_current = pvlib.pvsystem.i_from_v(resistance_shunt=self.params_R_sh_ref,
                                                           resistance_series=self.params_R_s,
@@ -292,8 +305,11 @@ class Photovoltaic(Serializable, Simulatable):
                                                           method='lambertw')
 
         # Set negative current values (in case of no sun irradiance) to zero
-        self.singlediode_current[self.singlediode_current<0] = 0
-
+        if self.singlediode_current < 0:
+            self.singlediode_current = 0
+        
+        #self.singlediode_current[self.singlediode_current < 0] = 0
+        
         # Calcuate power from I and V values
         self.singlediode_power = self.singlediode_current * self.singlediode_voltage
 

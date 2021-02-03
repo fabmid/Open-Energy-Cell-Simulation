@@ -1,0 +1,11 @@
+{
+    "specification": "heat_load",
+    "density_fluid": 1060,
+    "heat_capacity_fluid": 4182,
+    "heating_temperature_flow_target": 333.15,
+    "heating_temperature_flow": 333.15,
+    "heating_temperature_return": 308.15,
+    "hotwater_temperature_flow_target": 333.15,
+    "hotwater_temperature_flow": 333.15,
+    "hotwater_temperature_return": 293.15
+}

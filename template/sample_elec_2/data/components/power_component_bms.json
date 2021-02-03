@@ -1,0 +1,9 @@
+{
+    "specification": "BMS_active",
+    "efficiency_nominal": 0.972,
+    "voltage_loss": -0.001178,
+    "resistance_loss": 0.029869,
+    "power_self_consumption": 0.000115,
+    "end_of_life_power_components": 315360000,
+    "investment_costs_specific": 0.275
+}

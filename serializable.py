@@ -49,7 +49,7 @@ class Serializable:
 
     def save(self,
              file_path=None):
-        """Save component parameter to json file from componnet class attributes.
+        """Save component parameter to json file from component class attributes.
 
         Parameters
         ----------
@@ -63,9 +63,11 @@ class Serializable:
 
         # create json file in given file_path and save all parametrers given in __dict__ to it
         with open(file_path, "w") as json_file:
+            # Filtering of unserializable objects in json
             obj_attributes = dict()
             for obj in self.__dict__:
                 if not hasattr(self.__dict__[obj], '__dict__'):
                     obj_attributes[obj] = self.__dict__[obj]
+
             # final dump command with format parameter indent=4
             json.dump(obj_attributes, json_file, indent=4)

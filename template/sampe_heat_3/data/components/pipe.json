@@ -1,0 +1,12 @@
+{
+    "specification": "Piping Solarthermal to heat storage",
+    "heat_capacity": 382.0,
+    "density": 8940,
+    "wall_thickness": 0.00088,
+    "diameter_outer": 0.016,
+    "heat_transfer_coef": 2.0,
+    "temperature_heating_room": 293.15,
+    "factor_mass": 1.0,
+    "density_fluid": 1060.0,
+    "heat_capacity_fluid": 4182.0
+}

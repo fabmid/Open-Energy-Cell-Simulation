@@ -15,7 +15,7 @@ class Battery(Serializable, Simulatable):
         Class of component which supplies input power.
     environment : `class`
         To get access to solar irradiation, ambient temperature and windspeed.
-    file_name : `json`
+    file_path : `json`
         To load component parameters (optional).
 
     Note

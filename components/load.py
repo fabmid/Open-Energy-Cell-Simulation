@@ -43,4 +43,4 @@ class Load(Simulatable):
         if not isinstance(self.load_data, pandas.core.series.Series):
             self.load_data = self.load_demand.get_day_profile()
 
-        self.power = self.load_data[self.time % len(self.load_data)]
+        self.power = self.load_data.values[self.time % len(self.load_data)]
