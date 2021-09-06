@@ -2,9 +2,12 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import pvlib
-import data_loader
 
-class Environment():
+import data_loader
+from simulatable import Simulatable
+from serializable import Serializable
+
+class Environment(Serializable, Simulatable):
     """Relevant methods for the calculation of the global irradiation and sun position.
 
     Parameters
@@ -28,9 +31,23 @@ class Environment():
 
     def __init__(self,
                  timestep,
-                 system_orientation,
-                 system_location):
+                 file_path=None):
 
+        # Read component parameters from json file
+        if file_path:
+            self.load(file_path)
+        else:
+            print('Attention: No json file for environment model specified')
+            self.system_azimuth = 180
+            self.system_tilt = 45
+            self.location_latitude = 52.5210
+            self.location_longitude = 13.3929
+            self.location_timezone = 'Europe/Berlin'
+            self.location_altitude = 36
+            
+        # Integrate simulatable class for time indexing
+        Simulatable.__init__(self)
+        
         ## Data loader
         # Integrate irradiation and temperature/wind data loader for photovoltaic and windtubrine model
         self.meteo_irradiation = data_loader.MeteoIrradiation()
@@ -40,15 +57,21 @@ class Environment():
         self.timestep = timestep
 
         # PV module azimuth and inclination angle:
-        # Azimuth angle in degrees [°] (180°=north, 0°=south, 270°=east, 90°west)
-        self.system_azimuth = system_orientation[0]
-        self.system_tilt = system_orientation[1]
-        # System location
-        self.system_location = system_location
+        # PV azimuth in degrees [°] (0°=north, 90°=east, 180°=south, 270°=west)
+        self.system_azimuth = self.system_azimuth
+        # PV inclination in degrees [°]
+        self.system_tilt = self.system_tilt
+        
+        # System location        
+        self.system_location = pvlib.location.Location(latitude=self.location_latitude,
+                                                       longitude=self.location_longitude,
+                                                       tz=self.location_timezone,
+                                                       altitude=self.location_altitude)
+    
 
-
-    def load_data(self):
-        """Loads and calculates all relevant environment data, including total, \
+    def start(self):
+        """Simulatable method. 
+        Loads and calculates all relevant environment data, including total, \
         beam, sky, ground irradiation (pvlib), temperature in [K] and windspeed data in [m/s] \
         sun position (pvlib) and angle of inclination (pvlib).
 
@@ -96,7 +119,7 @@ class Environment():
            for solar radiation applications. Solar Energy, vol. 81, no. 6, p. 838, 2007.
         .. [3]	NREL SPA code: http://rredc.nrel.gov/solar/codesandalgorithms/spa/
         """
-        
+
         ## Time indexing
         # Extract environment values with data_loader from csv file
         self.time_step = self.meteo_irradiation.get_time()
@@ -108,11 +131,11 @@ class Environment():
         self.windspeed = pd.Series(self.meteo_weather.get_wind_speed().values, index=self.time_index)
         self.temperature_ambient = pd.Series(self.meteo_weather.get_temperature().values, index=self.time_index)
         self.air_pressure = pd.Series(self.meteo_weather.get_air_pressure().values, index=self.time_index)*100
-        # Fixed roughness length as long dataspource does not provide data
+        # Fixed roughness length as long as datasource does not provide data
         self.roughness_length = np.ones(len(self.windspeed))*0.1
         
-        ## Photovoltaic Model: Irradiation, temperature, wind data       
-        # Load environmental values (Irradiation, temperature and windspeed)
+        ## Sun Model: Irradiation, temperature, wind data       
+        # Irradiation: convert Irradiation [Wh] to irradiance [W]
         self.sun_bni = pd.Series((self.meteo_irradiation.get_bni().values) / (self.timestep/3600), index=self.time_index)
         self.sun_ghi = pd.Series((self.meteo_irradiation.get_ghi().values) / (self.timestep/3600), index=self.time_index)
         self.sun_dhi = pd.Series((self.meteo_irradiation.get_dhi().values) / (self.timestep/3600), index=self.time_index)

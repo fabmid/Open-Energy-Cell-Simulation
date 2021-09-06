@@ -32,7 +32,7 @@ class Simulatable:
 
         pass
 
-
+        
     def start(self):
         """Start Method, which initialize start method for all childs and
         sets time index to zero.
@@ -74,7 +74,7 @@ class Simulatable:
         ----------
         None : `None`
         """
-
+                
         # Call null method
         self.calculate()
 
@@ -84,5 +84,17 @@ class Simulatable:
         for child in self.childs:
             if isinstance(child, Simulatable):
                 child.update()
+      
 
+    def balance(self):
+        """Method, which updates carrier and checks its energy balance.
 
+        Parameters
+        ----------
+        None : `None`
+        """
+
+        # Calls update method for all simulatable childs
+        for child in self.childs:
+            if isinstance(child, Simulatable):
+                child.balance()

@@ -14,7 +14,7 @@ class Serializable:
     - Example of how to save battery parameters
         - anaconda prompt: navigate to base folder of simulation
         - open python
-        - from components.serializable import Serializable
+        - from serializable import Serializable
         - from component.battery import Battery
         - Serializable.save(Battery(None,None,None,None,"file path to battery.json"), "filepath to store new battery.json")
     - Attention json file is very sensible, manipulate it in spyder or suficated editor as atom.

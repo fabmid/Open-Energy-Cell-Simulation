@@ -7,12 +7,14 @@ from datetime import datetime
 from simulatable import Simulatable
 from environment import Environment
 
-from components.load import Load
-from components.photovoltaic import Photovoltaic
-from components.windturbine import Wind_Turbine
-from components.power_component import Power_Component
-from components.power_junction import Power_Junction
-from components.battery import Battery
+from components.electricity_sector.load_electricity import Load_Electricity
+from components.electricity_sector.photovoltaic import Photovoltaic
+from components.electricity_sector.windturbine import Wind_Turbine
+from components.electricity_sector.power_component import Power_Component
+from components.electricity_sector.battery import Battery
+from components.electricity_sector.grid import Grid
+
+from components.carrier import Carrier
 
 class Simulation(Simulatable):
     '''
@@ -77,7 +79,7 @@ class Simulation(Simulatable):
         #%% Initialize classes      
                         
         # load class
-        self.load = Load()
+        self.load = Load_Electricity()
         
         ## Photovoltaic system componnets
         # Environment class
@@ -98,11 +100,6 @@ class Simulation(Simulatable):
                                        input_link=self.pv, 
                                        file_path='data/components/power_component_mppt_pv.json')  
  
-       
-        ## Windturbine system components
-        # Environment class - WIND
-        #self.env_wt = Environment_Wind(timestep=self.timestep)       
-
         # Windturbine
         self.wt = Wind_Turbine(timestep,
                                peak_power=self.wt_nominal_power,
@@ -114,22 +111,26 @@ class Simulation(Simulatable):
                                           input_link=self.wt,
                                           file_path='data/components/power_component_mppt_wt.json')
         
+                
+        # Grid class
+        self.grid = Grid()
         
-        ## Central power knot
-        self.power_junction = Power_Junction(input_link_1=self.pv_charger, 
-                                             input_link_2=self.wt_charger, 
-                                             load=self.load)
- 
-       
+        # Electricity carrier
+        self.carrier = Carrier(input_link_1=self.pv_charger,
+                               input_link_2=self.wt_charger,
+                               output_link_1=self.load,
+                               grid_link= self.grid)
+
         ## Battery system components
         self.battery_management = Power_Component(timestep=self.timestep,
                                                   power_nominal=self.pv_peak_power, 
-                                                  input_link=self.power_junction, 
+                                                  input_link=self.carrier, 
                                                   file_path='data/components/power_component_bms.json')
 
         self.battery = Battery(timestep=self.timestep,
                                capacity_nominal_wh=self.battery_capacity, 
                                input_link=self.battery_management, 
+                               carrier_link=self.carrier,
                                env=self.env,
                                file_path='data/components/battery_lfp.json')
        
@@ -138,8 +139,9 @@ class Simulation(Simulatable):
         
         Simulatable.__init__(self,self.load,
                              self.env,self.pv,self.pv_charger,
-                              self.wt, self.wt_charger,
-                             self.power_junction, self.battery_management, self.battery)
+                             self.wt, self.wt_charger,
+                             self.grid, self.carrier,
+                             self.battery_management, self.battery)
 
 
     #%% run simulation for every timestep
@@ -172,9 +174,13 @@ class Simulation(Simulatable):
         # WT charger
         self.wt_charger_power = list()
         self.wt_charger_efficiency = list()
-                
-        # Power junction
-        self.power_junction_power = list()
+          
+        # Carrier
+        self.carrier_power = list()
+        self.carrier_power_storage = list()
+        
+        # Grid
+        self.grid_power = list()
         
         # BMS
         self.battery_management_power = list()
@@ -188,7 +194,6 @@ class Simulation(Simulatable):
         self.battery_state_of_health = list()
         self.battery_capacity_current_wh = list()
         self.battery_capacity_loss_wh = list()
-        self.battery_voltage = list()
         
         # Component state of destruction            
         self.pv_state_of_destruction = list()
@@ -244,9 +249,14 @@ class Simulation(Simulatable):
                 # WT charger
                 self.wt_charger_power.append(self.wt_charger.power)
                 self.wt_charger_efficiency.append(self.wt_charger.efficiency)
-        
-                # Power jundtion
-                self.power_junction_power.append(self.power_junction.power)
+
+                # Carrier
+                self.carrier_power.append(self.carrier.power)
+                self.carrier_power_storage.append(self.carrier.power_storage)
+                
+                # Grid
+                self.grid_power.append(self.grid.power)
+                
                 # BMS
                 self.battery_management_power.append(self.battery_management.power)
                 self.battery_management_efficiency.append(self.battery_management.efficiency)
@@ -259,7 +269,6 @@ class Simulation(Simulatable):
                 self.battery_state_of_health.append(self.battery.state_of_health)
                 self.battery_capacity_current_wh.append(self.battery.capacity_current_wh)
                 self.battery_capacity_loss_wh.append(self.battery.capacity_loss_wh)
-                self.battery_voltage.append(self.battery.voltage)
                 
                 # Component state of destruction
                 self.pv_state_of_destruction.append(self.pv.state_of_destruction)

@@ -6,9 +6,9 @@ __pycache__
 projects
 archive
 docs/API_documentation_OpEnCellS_Sphinx
+docs/archive
 docs/Documentation_OpEnCellS
 docs/Documentation_other technical
-components/heat_sector
-template/sample_heat_1
-template/sample_heat_2
-template/sample_heat_3
+components/chemical_sector/archive
+template
+projects

@@ -19,6 +19,24 @@ class CSV:
     
     """
 
+    def read_pkl(self,
+                 file_name):
+        """Loads the pkl file and stores it in parameter __data_set
+
+        Parameters
+        -----------
+        file_name : `str`
+            File path and name of fiel to be loaded.
+
+        Returns
+        -------
+        __data_set : `Pandas.Dataframe`
+            Pandas Dataframe with extracted data rows.
+        """
+
+        self.__data_set = pandas.read_pickle(file_name)
+
+
     def read_csv(self,
                  file_name,
                  start,
@@ -251,19 +269,7 @@ class LoadDemand(CSV):
     - Electricty load demand is a single column csv file for a timeframe of a day, week or year.
     
     """
-
-    def get_day_profile(self):
-        """Returns day load profile"""
-        return super().get_colomn(0)
     
-    def get_week_profile(self):
-        """Returns day load profile"""
-        return super().get_colomn(0)
-    
-    def get_year_profile(self):
-        """Returns year load profile"""
-        return super().get_colomn(0)
-
     def get_heating_profile(self):
         """Returns year load profile"""
         return super().get_colomn(0)
@@ -271,4 +277,7 @@ class LoadDemand(CSV):
     def get_hotwater_profile(self):
         """Returns year load profile"""
         return super().get_colomn(1)
-    
+
+    def get_power_profile(self):
+        """Returns day load profile"""
+        return super().get_colomn(2)    

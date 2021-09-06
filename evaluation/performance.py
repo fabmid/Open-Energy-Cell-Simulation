@@ -30,18 +30,23 @@ class Performance():
         self.timestep = timestep
 
 
-    def calculate(self):        
+    def pv_evaluation(self):
         '''
-        Parameters
-        ----------
-        None
-        '''         
-        self.state_of_charge_evaluation()
-        self.technical_objectives()
-        self.days_with_cut_offs()
+        Calculate direct used and unused Pv energy
+        '''
+        self.pv_energy_overall_kWh_a = sum(np.asarray(self.sim.pv_charger_power)  * (self.timestep/3600)) / 1000 \
+                                        / (self.sim.simulation_steps / (8760*(3600/self.timestep)))
 
-
-    def state_of_charge_evaluation(self):
+        if self.sim.pv_charger_power == 0:
+            self.pv_power_direct_use = 0
+            self.pv_power_no_direct_use = 0
+        else:
+            # Take min value between two lists (pv_power_charger & inverter_power_load)
+            self.pv_power_direct_use = [min(l1, l2) for l1, l2 in zip(self.sim.pv_charger_power, [-x for x in self.sim.inverter_power_load])]
+            self.pv_power_no_direct_use = [x1 - x2 for (x1, x2) in zip(self.sim.pv_charger_power, self.pv_power_direct_use)]
+  
+      
+    def battery_evaluation(self):
         '''
         Calculate Battery State of Charge at specific daytime
         
@@ -66,157 +71,219 @@ class Performance():
         Determines different technical objective evaluation parameters 
         Calculates:
             Loss of Power supply (LPS)
-            Power of load supplied
-            Power of PV which is unused
             Loss of Load Probability
             Level of Autonomy
+            Autonomy_power: Amounf of power supplied (-) and taken (+) from the grid
+            Autonomy_list: Time of power supplied (-1) and taken (+1) from the grid
+            Grid feed- in energy [Wh]
+            Grid feed-out energy [Wh]
+            Grid energy balance [Wh]
             
         Parameters
         ----------
         None
         '''
-        self.loss_of_power_supply = list()
-        self.power_load_supplied = list()
-        self.power_pv_unused = list()
+        self.loss_of_power_supply_list = list()
         self.level_of_autonomy_list = list()
+        # Amounf of power supplied (-) and taken (+) from the grid
+        self.autonomy_power = list()
+        # Time of power supplied (-1) and taken (+1) from the grid
+        self.autonomy_list = list()
         
         ## Calculation of loss of power supply and pv energy not used
-        for i in range(0,len(self.sim.power_junction_power)):
-            
-            # Battery discharge case
-            if self.sim.power_junction_power[i] < 0: 
-                self.loss_of_power_supply.append(abs(self.sim.power_junction_power[i] \
-                                                 - self.sim.battery_management_power[i] * self.sim.battery_management_efficiency[i]))
-                self.power_pv_unused.append(0)
+        for i in range(0,len(self.sim.grid_power)):
+        
+            # Days with grid demand
+            if self.sim.grid_power[i] > 0.01: 
+                self.loss_of_power_supply_list.append(self.sim.grid_power[i])
+                self.level_of_autonomy_list.append(1)
+                self.autonomy_power.append(self.sim.grid_power[i])
                 
-            # Battery charge case
-            elif self.sim.power_junction_power[i] > 0:
-                self.loss_of_power_supply.append(0)
-                # Check if bms efficeincy is > 0
-                if self.sim.battery_management_efficiency[i] > 0:
-                    self.power_pv_unused.append(abs(self.sim.power_junction_power[i] \
-                                                - self.sim.battery_management_power[i] / self.sim.battery_management_efficiency[i]))
-                else:
-                    self.power_pv_unused.append(abs(self.sim.power_junction_power[i]))
+                self.autonomy_list.append(1)
+                
+            # Days with grid supply
+            elif self.sim.grid_power[i] < -0.01:
+                self.loss_of_power_supply_list.append(0)
+                self.level_of_autonomy_list.append(0) 
+                self.autonomy_power.append(self.sim.grid_power[i])
             
+                self.autonomy_list.append(-1)
             # Idle case       
             else:
-                self.loss_of_power_supply.append(0)
-                self.power_pv_unused.append(0)
-
-            # Determination of level of autonomy
-            # Case loss of power supply - LA == 1
-            if self.loss_of_power_supply[i] > 0.0001:
-                self.level_of_autonomy_list.append(1)  
-            # Case no loss of power supply - LA == 0
-            else:
-                self.level_of_autonomy_list.append(0)  
+                self.loss_of_power_supply_list.append(0)
+                self.level_of_autonomy_list.append(0) 
+                self.autonomy_power.append(0)
                 
+                self.autonomy_list.append(0)
+                
+        # Loss of power Supply [kWh]
+        self.loss_of_power_supply_kWh = sum(np.asarray(self.loss_of_power_supply_list)*(self.timestep/3600)) / 1000
+        
         # Loss of Load Probability
-        self.loss_of_load_probability = sum(self.loss_of_power_supply) / sum(self.sim.load_power_demand)
-
-        # PV energy not used per day
-        self.energy_pv_unused_day = sum(self.power_pv_unused) \
-                                / (len(self.power_pv_unused) / (24*(3600/self.timestep)))
+        self.loss_of_load_probability = sum(self.loss_of_power_supply_list) \
+                                        / (abs(sum(self.sim.load_el_power))+abs(sum(self.sim.heat_pump_power_el)))
 
         # Level of autonomy
-        self.level_of_autonomy = 1 - (sum(self.level_of_autonomy_list)/np.count_nonzero(self.sim.load_power_demand)) 
+        self.level_of_autonomy = 1 - (sum(self.level_of_autonomy_list)/np.count_nonzero(self.sim.load_el_power)) 
 
-
-    def days_with_cut_offs(self):
+        # Grid energy feed-in [kWh/a]
+        self.grid_energy_feed_in_kWh_a = sum(np.asarray([x for x in self.autonomy_power if x < 0]) * (self.timestep/3600)) / 1000 \
+                                        / (self.sim.simulation_steps / (8760*(3600/self.timestep)))
+        # Grid energy feed-out [kWh/a]
+        self.grid_energy_feed_out_kWh_a = sum(np.asarray([x for x in self.autonomy_power if x > 0]) * (self.timestep/3600)) / 1000 \
+                                        / (self.sim.simulation_steps / (8760*(3600/self.timestep)))
+                                        
+        # Grid energy balance feed_in - feed_out [kWh/a]
+        self.grid_energy_balance_kWh_a = sum(np.asarray(self.autonomy_power)*(self.timestep/3600)) / 1000 \
+                                        / (self.sim.simulation_steps / (8760*(3600/self.timestep))) 
+      
+    def grid_evaluation(self):
         '''
-        Calculates Number of days with power cut offs
+        Detailed evaluation of time of power supplied (-1) and taken (+1) from the grid
         
         Parameters
         ----------
         None
         '''
-        # Day arrays of power cut offs
-        self.cut_off_day = np.array(np.split(np.array(self.level_of_autonomy_list), 
-                                             (len(self.level_of_autonomy_list)/(24*(3600/self.timestep)))
-                                             ))
+        # Day arrays of autonomy
+        self.autonomy_list_day = np.array(np.split(np.array(self.autonomy_list), 
+                                                   (len(self.autonomy_list)/(24*(3600/self.timestep)))
+                                        ))
 
-        # Number and percentage of days with cut offs
-        self.cut_off_day_list = list()
-        for i in range(0,len(self.cut_off_day)):
-            self.cut_off_day_list.append(max(self.cut_off_day[i,:]))
+#        self.cut_off_day
+#        # Number and percentage of days with cut offs
+#        self.cut_off_day_list = list()
+#        for i in range(0,len(self.cut_off_day)):
+#            self.cut_off_day_list.append(max(self.cut_off_day[i,:]))
+#
+#        self.cut_off_day_number = sum(self.cut_off_day_list) \
+#                                  / ((self.sim.simulation_steps*(self.timestep/3600))/8760)
+#        self.cut_off_day_percentage = sum(self.cut_off_day_list) / len(self.cut_off_day_list)
 
-        self.cut_off_day_number = sum(self.cut_off_day_list) \
-                                  / ((self.sim.simulation_steps*(self.timestep/3600))/8760)
-        self.cut_off_day_percentage = sum(self.cut_off_day_list) / len(self.cut_off_day_list)
-
-        # Daily distribution of cut offs
-        self.cut_off_day_distribution_daily = list()
-        for i in range(0,24):
-            if sum(self.cut_off_day[:,i]) == 0:
-                self.cut_off_day_distribution_daily.append(0)
-            else:
-                self.cut_off_day_distribution_daily.append((self.cut_off_day[:,i]) / sum(self.cut_off_day[:,i]))
-
-
-    def figure_format(self):
-        MEDIUM_SIZE = 10
-        BIGGER_SIZE = 12
-        plt.rc('font', size=MEDIUM_SIZE)          # controls default text sizes
-        plt.rc('axes', titlesize=BIGGER_SIZE)     # fontsize of the axes title
-        plt.rc('axes', labelsize=BIGGER_SIZE)    # fontsize of the x and y labels
-        plt.rc('xtick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
-        plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
-        plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
-        plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-        self.figsize = (5,3)
-
-
-    def plot_loss_of_power_supply(self):
-        self.figure_format()
-
-        plt.figure(figsize=self.figsize)
-        plt.plot(self.sim.timeindex, self.loss_of_power_supply, '-b', label='loss _of_power_supply')
-        plt.xlabel('Time [date]')
-        plt.ylabel('Loss of Power Supply [Wh]')
-        plt.legend(bbox_to_anchor=(0., 1.1), loc=2, borderaxespad=0., ncol=4)
-        plt.grid()
-        plt.show()
-
-
-    def plot_soc_days(self):
-        self.figure_format()
-
-        plt.figure(figsize=self.figsize)
-        #Carpet plot
-        plt.title('Battery state of Charge')
-        plt.imshow(self.state_of_charge_dayarray, aspect='auto')
-        plt.colorbar()
-        plt.xlabel('Time of day [h]')
-        plt.ylabel('Day of simulation timeframe')
-        plt.grid()
-        plt.show()
+        # Daily distribution of grid feed-in and feed-out
+        self.feed_in_distribution_daily = list()
+        self.feed_out_distribution_daily = list()
         
-    def plot_cut_off_days(self):
-        self.figure_format()
-
-        plt.figure(figsize=self.figsize)
-        #Carpet plot
-        plt.title('Power Cut offs')
-        plt.imshow(self.cut_off_day, aspect='auto')
-        plt.colorbar()
-        plt.xlabel('Time of day [h]')
-        plt.ylabel('Day of simulation timeframe')
-        plt.grid()
-        plt.show()
+        for i in range(0,self.autonomy_list_day.shape[1]):
+            # If only zeros - no calculation
+            if all(x==0 for x in self.autonomy_list_day[:,i]):
+                self.feed_in_distribution_daily.append(0)
+                self.feed_out_distribution_daily.append(0)
+            else:
+                self.feed_in_distribution_daily.append(sum([x for x in self.autonomy_list_day[:,i] if x < 0]) / self.autonomy_list_day.shape[0])
+                self.feed_out_distribution_daily.append(sum([x for x in self.autonomy_list_day[:,i] if x > 0]) / self.autonomy_list_day.shape[0])
 
 
+    def technical_evaluation(self):
+        """
+        Determines different technical evaluation parameters 
+        Calculates:
+            Electric and heat load energy [kWh]
+            Inverter energy [kWh]
+            PV energy provided by the panel [kWh]
+            Battery energy provided by discharge [kWh]
+            Fuel cell energy provided [kWh]
+            Battery energy stored by charge [kWh]
+            Electrolyzer energy produced through hydrogen production [kWh]
+            
+            Electrolyzer mean operating hours per year [h/a]
+            Fuel cell mean operation hours per year [h/a]
+            
+        Parameters
+        ----------
+        None
+        """
+        ## Load
+        self.load_energy_el_kWh_a = abs(sum(np.asarray(self.sim.load_el_power)*(self.timestep/3600)/1000)) \
+                                  / (self.sim.simulation_steps / (8760*(3600/self.timestep)))
+
+        self.load_energy_heating_kWh_a = abs(sum(np.asarray(self.sim.load_heating_power)*(self.timestep/3600)/1000)) \
+                                        / (self.sim.simulation_steps / (8760*(3600/self.timestep)))
+        self.load_energy_hotwater_kWh_a = abs(sum(np.asarray(self.sim.load_hotwater_power)*(self.timestep/3600)/1000)) \
+                                        / (self.sim.simulation_steps / (8760*(3600/self.timestep)))        
+        self.load_energy_heat_kWh_a = self.load_energy_heating_kWh_a + self.load_energy_hotwater_kWh_a
+        
+        ## Electricty
+        self.inverter_energy_kWh = (sum(np.asarray(self.sim.inverter_power_load)*(self.timestep/3600)/1000))
+        
+        self.pv_energy_provided_kWh = (sum(np.asarray(self.pv_power_direct_use)\
+                                       *(self.timestep/3600)/1000))
+
+        self.battery_energy_provided_kWh = abs(sum(np.asarray([x for x in self.sim.battery_power if x < 0])\
+                                           *(self.timestep/3600)/1000))
+
+        self.fuelcell_energy_provided_kWh = (sum(np.asarray(self.sim.fuelcell_power_to_load) \
+                                            *(self.timestep/3600)/1000))
+        
+#        self.fuelcell_energy_provided_kWh = (sum(np.asarray(self.sim.pv_charger_power) \
+#                                        *(self.timestep/3600)/1000))
+
+        self.battery_energy_stored_kWh = (sum(np.asarray([x for x in self.sim.battery_power if x > 0])\
+                                          *(self.timestep/3600)/1000))
+ 
+        self.electrolyzer_energy_prouced_kWh = (sum(np.asarray(self.sim.electrolyzer_power) \
+                                                *(self.timestep/3600)/1000))
+
+        ## Heat
+        self.heat_pump_energy_el_consumed_kWh = abs(sum(np.asarray(self.sim.heat_pump_power_el) \
+                                                *(self.timestep/3600)/1000))
+
+        self.heat_pump_energy_el_consumed_kWh_a = abs(sum(np.asarray(self.sim.heat_pump_power_el) \
+                                                *(self.timestep/3600)/1000)) \
+                                                / (self.sim.simulation_steps / (8760*(3600/self.timestep)))
+
+        self.heat_pump_energy_th_provided_kWh = (sum(np.asarray(self.sim.heat_pump_power_th) \
+                                                *(self.timestep/3600)/1000))
+        
+        self.electrolyzer_energy_th_provided_kWh = (sum(np.asarray(self.sim.electrolyzer_heat) \
+                                                *(self.timestep/3600)/1000))
+        self.fuelcell_energy_th_provided_kWh = (sum(np.asarray(self.sim.fuelcell_heat) \
+                                                *(self.timestep/3600)/1000))
+        
+        ## Operation time
+        self.electrolyzer_operating_hours_year = max(self.sim.electrolyzer_operation) * (self.timestep/3600) \
+                                                 / (self.sim.simulation_steps / (8760*(3600/self.timestep)))   
+
+        self.fuelcell_operating_hours_year = max(self.sim.fuelcell_operation) * (self.timestep/3600) \
+                                             / (self.sim.simulation_steps / (8760*(3600/self.timestep)))  
+         
+                                        
     def print_technical_objective_functions(self):
         print('---------------------------------------------------------')
         print('Objective functions - Technical')
         print('---------------------------------------------------------')
-        print('Loss of power Supply [Wh]=', sum(self.loss_of_power_supply).round(2))
-        print('Loss of load propability [1]=', (self.loss_of_load_probability).round(4))
+        print('Loss of power Supply [kWh]=', round(self.loss_of_power_supply_kWh, 2))
+        print('Loss of load propability [1]=', round(self.loss_of_load_probability,2))
         print('level of autonomy [1]=', round(self.level_of_autonomy,4))
-        print('No. of days with cut off per year [d/a]=', self.cut_off_day_number)
 
+        print('Grid energy feed-in [kWh/a]', round(self.grid_energy_feed_in_kWh_a, 2))
+        print('Grid energy feed-out [kWh/a]', round(self.grid_energy_feed_out_kWh_a, 2))
+        print('Grid energy balance [kWh/a]', round(self.grid_energy_balance_kWh_a, 2))
+
+
+    def print_technical_evaluation(self):
         print('---------------------------------------------------------')
-        print('Components')
+        print('Evaluation - Technical')
         print('---------------------------------------------------------')
-        print('PV Energy not used [Wh/day]', round(self.energy_pv_unused_day,2))
-        print('SoC mean =', round(np.mean(self.state_of_charge_dayarray),2))
+        print('Electricty load energy [kWh/a]=',  round(self.load_energy_el_kWh_a, 2))
+        print('Heating Load energy [kWh/a]=', round(self.load_energy_heating_kWh_a, 2))
+        print('HotWater Load energy [kWh/a]=', round(self.load_energy_hotwater_kWh_a, 2))
+        print('Heat pump energy el consumed [kWh/a]=', round(self.heat_pump_energy_el_consumed_kWh_a, 2))
+        print('---------------------------------------------------------')        
+        print('PV energy produced [kWh/a]', round(self.pv_energy_overall_kWh_a, 2))
+        print('---------------------------------------------------------')
+        print('Inv Load el energy [kWh]=', round(self.inverter_energy_kWh, 2))
+        print('PV energy provided [kWh]=', round(self.pv_energy_provided_kWh, 2))
+        print('Bat energy provided (DCH) [kWh]=', round(self.battery_energy_provided_kWh, 2))
+        print('FC energy provided [kWh]=', round(self.fuelcell_energy_provided_kWh, 2))
+        print('Bat energy stored (CH) [kWh]=', round(self.battery_energy_stored_kWh, 2))
+        print('Ely H2 energy produced [kWh]=', round(self.electrolyzer_energy_prouced_kWh, 2))
+        print('---------------------------------------------------------')
+        print('Heat pump energy el consumed [kWh]=', round(self.heat_pump_energy_el_consumed_kWh, 2))
+        print('Heat pump energy th provided [kWh]=', round(self.heat_pump_energy_th_provided_kWh, 2))
+        print('Electrolyzer energy th provided [kWh]=', round(self.electrolyzer_energy_th_provided_kWh, 2))
+        print('Fuelcell energy th provided [kWh]=', round(self.fuelcell_energy_th_provided_kWh, 2))
+        print('---------------------------------------------------------')
+        print('Ely operation hours per year [h/a]=', round(self.electrolyzer_operating_hours_year, 2))
+        print('FC operation hours per year [h/a]=', round(self.fuelcell_operating_hours_year, 2))
+        
