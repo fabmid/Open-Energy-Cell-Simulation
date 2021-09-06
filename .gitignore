@@ -3,6 +3,7 @@
 __pycache__
 
 # Exclude folder
+template
 projects
 archive
 docs/API_documentation_OpEnCellS_Sphinx
@@ -10,5 +11,4 @@ docs/archive
 docs/Documentation_OpEnCellS
 docs/Documentation_other technical
 components/chemical_sector/archive
-template
-projects
+
