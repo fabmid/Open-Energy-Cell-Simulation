@@ -82,15 +82,6 @@ class Inverter(Serializable, Simulatable):
         self.replacement_set = 0
 
 
-    def start(self):
-        """Simulatable method, sets time=0 at start of simulation.       
-        """
-
-
-    def end(self):
-        """Simulatable method, sets time=0 at end of simulation.    
-        """
-
     def calculate(self):
         """Calls state of destruction calculation of inverter
 

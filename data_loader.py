@@ -252,16 +252,15 @@ class LoadDemand(CSV):
 
     Returns
     -------
-    day_profile : `pandas.series float`
-        [Wh] Pandas series of daily load profile specifies load demand per timestep in watthours.
-    week_profile : `pandas.series float`
-        [Wh] Pandas series of weekly load profile specifies load demand per timestep in watthours.
-    year_profile : `pandas.series float`
-        [Wh] Pandas series of yearly load profile specifies load demand per timestep in watthours.
     heating_profile : `pandas.series float`
-        [Wh] Pandas series of load profile specifies heating load demand per timestep in watthours.
+        [W] Pandas series of heating load profile specifies heating load demand per timestep in watt.
     hotwater_profile : `pandas.series float`
-        [Wh] Pandas series of load profile specifies hot water load demand per timestep in watthours.
+        [W] Pandas series of load profile specifies hot water load demand per timestep in watt.
+    power_profile : `pandas.series float`
+        [W] Pandas series of load profile specifies power load demand per timestep in watt.
+    cooling_profile : `pandas.series float`
+        [W] Pandas series of load profile specifies cooling load demand per timestep in watt.
+        
     Note
     ----
     - Implemented method is usually integrated in load class to directly load load profile data.
@@ -271,13 +270,17 @@ class LoadDemand(CSV):
     """
     
     def get_heating_profile(self):
-        """Returns year load profile"""
+        """Returns load profile"""
         return super().get_colomn(0)
 
     def get_hotwater_profile(self):
-        """Returns year load profile"""
+        """Returns load profile"""
         return super().get_colomn(1)
 
     def get_power_profile(self):
-        """Returns day load profile"""
-        return super().get_colomn(2)    
+        """Returns load profile"""
+        return super().get_colomn(2)  
+    
+    def get_cooling_profile(self):
+        """Returns load profile"""
+        return super().get_colomn(3)  

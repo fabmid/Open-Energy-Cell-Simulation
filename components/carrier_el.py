@@ -52,16 +52,6 @@ class Carrier_el(Simulatable):
         self.power_fc_to_battery = 0
         self.power_fc_to_load = 0
 
-
-    def start(self):
-        """Simulatable method, sets time=0 at start of simulation.       
-        """
-
-
-    def end(self):
-        """Simulatable method, sets time=0 at end of simulation.    
-        """
-        
         
     def calculate(self):
         """Energy Management system.
@@ -110,7 +100,7 @@ class Carrier_el(Simulatable):
             self.ems_battery(input_link_power=self.power_0)        
                
             # Recalc power after battery usage (1.component)
-            self.power_1 = self.power_0 - self.battery.power
+            self.power_1 = round((self.power_0 - self.battery.power),4)
             
             # Call electrolyzer EMS systen
             self.ems_electrolyzer(input_link_power=self.power_1)
@@ -128,7 +118,7 @@ class Carrier_el(Simulatable):
                 self.ems_battery(input_link_power=self.power_0)  
                 
                 # Recalc power after battery usage (1.component)
-                self.power_1 = self.power_0 - self.battery.power
+                self.power_1 = round((self.power_0 - self.battery.power),4)
                 
                 # Call fuel cell EMS system
                 self.ems_fuelcell(output_link_power=self.power_1)
@@ -145,21 +135,14 @@ class Carrier_el(Simulatable):
                 self.ems_electrolyzer(input_link_power=0)   
 
                 # Recalc power after hydrogen system usage (1.component)
-                self.power_1 = self.power_0 + self.fuelcell.power - self.electrolyzer.power   
+                self.power_1 = round((self.power_0 + self.fuelcell.power - self.electrolyzer.power),4) 
                 
                 # Call battery EMS system
                 self.ems_battery(input_link_power=self.power_1)  
             
                 # Recalc power after hydrogen system usage
                 self.power_2 = self.power_1 - self.battery.power          
-        
-#        ## No demand and surplus energy
-#        else:
-#            # Call battery EMS system
-#            self.ems_battery(input_link_power=self.power_0) 
-#            self.power_1 = self.power_0
-#            self.power_2 = self.power_0
-            
+
 
         ## Grid inverter    
         # Rest power is supplied to grid (consider Inverter)
@@ -178,7 +161,7 @@ class Carrier_el(Simulatable):
         # Set grid power (Einspeisung -) (Ausspeisung +)
         self.grid.power = - (self.inverter.power_grid)
 
-            
+        
     def ems_battery(self, input_link_power):
         """
         Energy Management System for battery.       
@@ -311,7 +294,6 @@ class Carrier_el(Simulatable):
         self.battery.get_state_of_destruction()
      
 
-
     def ems_electrolyzer(self, input_link_power):
         """
         Energy Management System for electrolyzer.
@@ -402,7 +384,7 @@ class Carrier_el(Simulatable):
             # Power demand is below optimal operation point
             if self.fuelcell.power < (self.fuelcell.operation_point_optimum  * self.fuelcell.power_nominal):
                 self.fuelcell.power = (self.fuelcell.operation_point_optimum  * self.fuelcell.power_nominal)
-                        
+
             # Power demand exceeds nominal power
             elif self.fuelcell.power > self.fuelcell.power_nominal:
                 #print('Attention: Fuelcell maximum power exceeded, Battery deep discharge danger')

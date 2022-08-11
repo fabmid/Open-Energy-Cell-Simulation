@@ -57,6 +57,7 @@ class Photovoltaic(Serializable, Simulatable):
             self.params_pdc0 = 184.7016                                         # [W] Photovoltaic power of the modules at 1000 W/m2 and cell reference temperature
             self.params_gamma_pdc = -0.005                                      # [1/C] The temperature coefficient. Typically -0.002 to -0.005
             self.degradation_pv = 1.58154e-10                                   # [1/s] Photovoltaic degradation per second: deg_yearly=0.5% --> 0.005 / (8760*3600)
+            self.end_of_life_condition = 0.8                                    # [-] Component end of life condition
             self.investment_costs_a = -0.000006                                 # [] Economic function factor a
             self.investment_costs_b = 2.6747                                    # [] Economic function factor b
             self.operation_maintenance_costs_share = 0.05                       # [1] Share of omc costs of cc

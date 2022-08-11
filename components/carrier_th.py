@@ -48,15 +48,6 @@ class Carrier_th(Simulatable):
         self.power_1 = 0
         self.power_2 = 0
         
-    def start(self):
-        """Simulatable method, sets time=0 at start of simulation.       
-        """
-
-
-    def end(self):
-        """Simulatable method, sets time=0 at end of simulation.    
-        """
-        
         
     def calculate(self):
         """Energy Management system.
@@ -100,6 +91,8 @@ class Carrier_th(Simulatable):
         self.heat_storage.get_temperature()
 
         # Call Heat Pump EMS system
+        # set heat pump to heating working mode (1)
+        self.heat_pump.working_mode = 1
         self.ems_heat_pump()
      
         ## Heat storage
@@ -108,8 +101,6 @@ class Carrier_th(Simulatable):
         self.heat_storage.power = self.power_1
         self.heat_storage.get_temperature()       
 
-
-        ##REVISION
 
         # Check heat storage temperature level
         if self.heat_storage.temperature < self.heat_storage.temperature_minimum:
@@ -123,8 +114,6 @@ class Carrier_th(Simulatable):
             self.heat_pump.power -= self.power_2 # funzt noch nciht.
             self.heat_pump.speed_set = 'electric_heater'
             #print('electric heater')
-
-
             
     def ems_heat_pump(self):
         """
@@ -140,12 +129,11 @@ class Carrier_th(Simulatable):
         None : `None`
         """
         
-        # Get evaporator temperature [K]
-        self.heat_pump.temperature_evap = (self.env.temperature_ambient[self.time])
-        if self.heat_pump.temperature_evap < self.heat_pump.temperature_threshold_icing:
+        # Get primary temperature (ambient conditions) [K]
+        self.heat_pump.temperature_in_prim = (self.env.temperature_ambient[self.time])
+        # Integrate icing losses
+        if self.heat_pump.temperature_in_prim < self.heat_pump.temperature_threshold_icing:
             self.heat_pump.icing = self.heat_pump.factor_icing
-        # Get condenser temperature
-        self.heat_pump.temperature_cond = self.heat_pump.temperature_flow
         
         
         ## Heat pump runnign algorithm
@@ -158,15 +146,10 @@ class Carrier_th(Simulatable):
 
             # Set heat pump operation mode to 'On'
             self.heat_pump.operation_mode = 'On'
-            # Set heat pump speed level --> Integrate speed level
-            self.heat_pump.speed_set = 'speed_100'
 
             # Thermal power calculation
-            self.heat_pump.get_power_thermal()
-            # Electric power calculation
-            self.heat_pump.get_power_electric()   
-            # COP calculation
-            self.heat_pump.cop = self.heat_pump.power_th / self.heat_pump.power_el
+            self.heat_pump.get_power_heating_mode()
+
             
         # HP is switsched off or stays off
         elif self.heat_pump.operation_mode == 'On' \
@@ -177,8 +160,6 @@ class Carrier_th(Simulatable):
             
             # Set heat pump operation mode to 'Off'
             self.heat_pump.operation_mode = 'Off'
-            # Set heat pump speed level
-            self.heat_pump.speed_set = 'speed_0'
 
             # Thermal power calculation
             self.heat_pump.power_th = 0.

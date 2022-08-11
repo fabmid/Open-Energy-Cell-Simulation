@@ -121,7 +121,7 @@ class Performance():
         
         # Loss of Load Probability
         self.loss_of_load_probability = sum(self.loss_of_power_supply_list) \
-                                        / (abs(sum(self.sim.load_el_power))+abs(sum(self.sim.heat_pump_power_el)))
+                                        / (abs(sum(self.sim.load_el_power))+abs(sum(self.sim.heat_pump_power_el))+abs(sum(self.sim.heat_pump_c_power_el)))
 
         # Level of autonomy
         self.level_of_autonomy = 1 - (sum(self.level_of_autonomy_list)/np.count_nonzero(self.sim.load_el_power)) 
@@ -202,7 +202,10 @@ class Performance():
         self.load_energy_hotwater_kWh_a = abs(sum(np.asarray(self.sim.load_hotwater_power)*(self.timestep/3600)/1000)) \
                                         / (self.sim.simulation_steps / (8760*(3600/self.timestep)))        
         self.load_energy_heat_kWh_a = self.load_energy_heating_kWh_a + self.load_energy_hotwater_kWh_a
-        
+
+        self.load_energy_cooling_kWh_a = abs(sum(np.asarray(self.sim.load_cooling_power)*(self.timestep/3600)/1000)) \
+                                        / (self.sim.simulation_steps / (8760*(3600/self.timestep)))  
+                                        
         ## Electricty
         self.inverter_energy_kWh = (sum(np.asarray(self.sim.inverter_power_load)*(self.timestep/3600)/1000))
         
@@ -224,14 +227,21 @@ class Performance():
         self.electrolyzer_energy_prouced_kWh = (sum(np.asarray(self.sim.electrolyzer_power) \
                                                 *(self.timestep/3600)/1000))
 
+        ## cooling
+        self.heat_pump_c_energy_el_consumed_kWh = abs(sum(np.asarray(self.sim.heat_pump_c_power_el) \
+                                                *(self.timestep/3600)/1000))
+        self.heat_pump_c_energy_el_consumed_kWh_a = abs(sum(np.asarray(self.sim.heat_pump_c_power_el) \
+                                                *(self.timestep/3600)/1000)) \
+                                                / (self.sim.simulation_steps / (8760*(3600/self.timestep)))
+        self.heat_pump_c_energy_th_provided_kWh = (sum(np.asarray(self.sim.heat_pump_c_power_th) \
+                                                *(self.timestep/3600)/1000))
+        
         ## Heat
         self.heat_pump_energy_el_consumed_kWh = abs(sum(np.asarray(self.sim.heat_pump_power_el) \
                                                 *(self.timestep/3600)/1000))
-
         self.heat_pump_energy_el_consumed_kWh_a = abs(sum(np.asarray(self.sim.heat_pump_power_el) \
                                                 *(self.timestep/3600)/1000)) \
                                                 / (self.sim.simulation_steps / (8760*(3600/self.timestep)))
-
         self.heat_pump_energy_th_provided_kWh = (sum(np.asarray(self.sim.heat_pump_power_th) \
                                                 *(self.timestep/3600)/1000))
         
@@ -269,6 +279,8 @@ class Performance():
         print('Heating Load energy [kWh/a]=', round(self.load_energy_heating_kWh_a, 2))
         print('HotWater Load energy [kWh/a]=', round(self.load_energy_hotwater_kWh_a, 2))
         print('Heat pump energy el consumed [kWh/a]=', round(self.heat_pump_energy_el_consumed_kWh_a, 2))
+        print('Cooling energy [kWh/a]=', round(self.load_energy_cooling_kWh_a, 2))
+        print('Heat pump_c energy el consumed [kWh/a]=', round(self.heat_pump_c_energy_el_consumed_kWh_a, 2))
         print('---------------------------------------------------------')        
         print('PV energy produced [kWh/a]', round(self.pv_energy_overall_kWh_a, 2))
         print('---------------------------------------------------------')
@@ -281,6 +293,9 @@ class Performance():
         print('---------------------------------------------------------')
         print('Heat pump energy el consumed [kWh]=', round(self.heat_pump_energy_el_consumed_kWh, 2))
         print('Heat pump energy th provided [kWh]=', round(self.heat_pump_energy_th_provided_kWh, 2))
+        print('Heat pump_c energy el consumed [kWh]=', round(self.heat_pump_c_energy_el_consumed_kWh, 2))
+        print('Heat pump_c energy th provided [kWh]=', round(self.heat_pump_c_energy_th_provided_kWh, 2))
+        
         print('Electrolyzer energy th provided [kWh]=', round(self.electrolyzer_energy_th_provided_kWh, 2))
         print('Fuelcell energy th provided [kWh]=', round(self.fuelcell_energy_th_provided_kWh, 2))
         print('---------------------------------------------------------')

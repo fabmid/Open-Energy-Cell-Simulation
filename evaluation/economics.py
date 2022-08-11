@@ -129,7 +129,7 @@ class Economics(Serializable):
     
         # Calculate Levelized Cost of Energy (Mischpreis bezogen auf kWh Strom und Wärme)
         self.levelized_cost_energy = self.annuity_total_levelized_costs_overall \
-                                    / (self.performance.load_energy_el_kWh_a + self.performance.heat_pump_energy_el_consumed_kWh_a)
+                                    / (self.performance.load_energy_el_kWh_a + self.performance.heat_pump_energy_el_consumed_kWh_a + self.performance.heat_pump_c_energy_el_consumed_kWh_a)
                                      
         #/ (self.performance.load_energy_el_kWh_a + self.performance.load_energy_heat_kWh_a)
                                      

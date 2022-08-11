@@ -93,19 +93,12 @@ class Electrolyzer(Serializable, Simulatable):
         self.operation_maintenance_costs_specific = self.operation_maintenance_costs_share \
                                                     * self.investment_costs_specific
     
-    def start(self):
-        """Simulatable method, sets time=0 at start of simulation.       
-        """
-
-    def end(self):
-        """Simulatable method, sets time=0 at end of simulation.    
-        """
 
     def calculate(self):
         """Simulatable method.
         Calculation is done inside energy management of electricty carrier.
         """        
-
+        pass
           
     def get_power(self):
         """ Calculates the electrolyzer power and efficiencies.

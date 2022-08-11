@@ -93,43 +93,6 @@ class Load_Heat(Serializable, Simulatable):
                                          * (self.hotwater_temperature_flow - self.hotwater_temperature_return))
 
         
-        ## !!! FAST AND DIRTY
+        ## Combine heat power as sum of heating and hot drinkign water
         self.power = self.heating_power + self.hotwater_power
         
-#    def re_calculate(self):
-#        """Recalculates volume flow rate of load components with real flow temperature
-#        coming from the heat storage.
-#
-#        Parameters
-#        ----------
-#        None : `None`
-#
-#        Returns
-#        -------
-#        heating_temperature_flow : `float`
-#            [K] Heating load temperature of flow in Kelvin.
-#        heating_volume_flow_rate : `float`
-#            [m3/s] Heating load volume flow rate.
-#        hotwater_temperature_flow : `float`
-#            [K] Hot Water load temperature of flow in Kelvin.
-#        hotwater_volume_flow_rate : `float`
-#            [m3/s] Hot Water load volume flow rate.
-#
-#       Note
-#        ----
-#        - Can be called externally, e.g. from heat storage class.
-#        """
-#
-#        ## Heating demand
-#        # Define flow temperature of hot water heat load
-#        self.heating_temperature_flow = self.heating_temperature_flow
-#        # Re-calculate volume flow rate of hot water heat load [m3/s]
-#        self.heating_volume_flow_rate = self.heating_power / (self.heat_capacity_fluid * self.density_fluid \
-#                                         * (self.heating_temperature_flow - self.heating_temperature_return))
-#
-#        ## Hot water demand
-#        # Define flow temperature of hot water heat load
-#        self.hotwater_temperature_flow = self.hotwater_temperature_flow
-#        # Re-calculate volume flow rate of hot water heat load [m3/s]
-#        self.hotwater_volume_flow_rate = self.hotwater_power / (self.heat_capacity_fluid * self.density_fluid \
-#                                         * (self.hotwater_temperature_flow - self.hotwater_temperature_return))

@@ -12,7 +12,7 @@ class Heat_storage(Serializable, Simulatable):
      Parameters
     ----------
     storage_volume : `int`
-        [m3] : Storage volume.
+        [l] : Storage volume.
     storage_number : `int`
         [-] : Number of storages.
     timestep : `int`
@@ -68,14 +68,14 @@ class Heat_storage(Serializable, Simulatable):
 
         # [s] Timestep
         self.timestep = timestep
-        # [m3] Storage volume
+        # [l] Storage volume
         self.storage_volume = storage_volume
         # [-] Number of storages
         self.storage_number = storage_number
         
         # Determine storage dimensions
         # [m3] Storage volume
-        self.volume = self.storage_volume * self.storage_number 
+        self.volume = self.storage_volume * self.storage_number / 1000
         # [m] Storage height        
         self.height_storage = self.volume * self.share_height_volume    
         # [m] Storage diameter
@@ -101,16 +101,7 @@ class Heat_storage(Serializable, Simulatable):
                                                     
         # Aging model
         self.replacement_set = 0
-        
-    def start(self):
-        """Simulatable method, sets time=0 at start of simulation.       
-        """
-
-
-    def end(self):
-        """Simulatable method, sets time=0 at end of simulation.    
-        """
-        
+           
        
     def calculate(self):
         """Simulatable method.
@@ -138,8 +129,8 @@ class Heat_storage(Serializable, Simulatable):
 
         # Heat storage temperature change per time
         self.temperature_change = ((1/(self.density_fluid * self.volume * self.heat_capacity_fluid)) \
-                                   * self.power) * (self.timestep)
-            
+                                   * self.power) * (self.timestep)            
+
       # Heat storage temperature
         self.temperature = self.temperature + self.temperature_change
         
@@ -153,15 +144,15 @@ class Heat_storage(Serializable, Simulatable):
         
         Note
         ----
-        - self discharge energy los is considered.
+        - self discharge energy loss is considered.
         """
 
-        # Heat storage temperature change per time through self discharge
+        # Heat storage temperature change per time through self discharge                                  
         self.temperature_change = ((1/(self.density_fluid * self.volume * self.heat_capacity_fluid)) \
                                    * (- self.surface * self.heat_transfer_coef_storage \
                                    * (self.temperature - self.temperature_heating_room))) \
                                    * (self.timestep)
-            
+                                   
       # Heat storage temperature
         self.temperature = self.temperature + self.temperature_change
         

@@ -21,18 +21,7 @@ class Simulatable:
         self.time = -1
         self.childs = list(childs)
 
-
-    def calculate(self):
-        """Null methods - stands for for calculation methods of component classes.
-
-        Parameters
-        ----------
-        None : `None`
-        """
-
-        pass
-
-        
+       
     def start(self):
         """Start Method, which initialize start method for all childs and
         sets time index to zero.
@@ -44,9 +33,11 @@ class Simulatable:
 
         # Set time index to zero
         self.time = 0
+
         # Calls start method for all simulatable childs
         for child in self.childs:
             if isinstance(child, Simulatable):
+                child.time = 0 # for classes who have own start() method.
                 child.start()
 
 
@@ -67,6 +58,21 @@ class Simulatable:
                 child.end()
 
 
+    def calculate(self):
+        """Null methods - stands for for calculation methods of component classes.
+
+        Parameters
+        ----------
+        None : `None`
+        """
+
+        # Call method if apparent in child classes
+        # Calls start method for all simulatable childs
+        for child in self.childs:
+            if isinstance(child, Simulatable):
+                child.calculate()
+
+
     def update(self):
         """Method, which updates time index and goes to next simulation step for all childs.
 
@@ -75,8 +81,8 @@ class Simulatable:
         None : `None`
         """
                 
-        # Call null method
-        self.calculate()
+#        # Call method if apparent in child classes
+#        self.calculate()
 
         # Update time parameters with +1
         self.time += 1
@@ -84,7 +90,7 @@ class Simulatable:
         for child in self.childs:
             if isinstance(child, Simulatable):
                 child.update()
-      
+
 
     def balance(self):
         """Method, which updates carrier and checks its energy balance.

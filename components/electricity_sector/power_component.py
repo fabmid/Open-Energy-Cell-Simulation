@@ -79,16 +79,7 @@ class Power_Component(Serializable, Simulatable):
         
         ## Aging model
         self.replacement_set = 0
- 
-       
-    def start(self):
-        """Simulatable method, sets time=0 at start of simulation.       
-        """
 
-    def end(self):
-        """Simulatable method, sets time=0 at end of simulation.    
-        """
-  
         
     def calculate(self):
         """Calculates all power component performance parameters from

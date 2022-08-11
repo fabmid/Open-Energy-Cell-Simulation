@@ -62,6 +62,7 @@ class Economics(Serializable):
 
         # Sensitivity parameter
         self.sensi_parameter = sensi_parameter
+
         
     def calculate(self):
         '''
@@ -129,10 +130,14 @@ class Economics(Serializable):
                                                     + self.annuity_grid_feed_out_costs \
                                                     - self.annuity_grid_feed_in_costs
     
-    
+#        print('self.results.loc[A_tlc].sum()',self.results.loc['A_tlc'].sum())
+#        print('self.annuity_grid_feed_out_costs', self.annuity_grid_feed_out_costs)
+#        print('self.annuity_grid_feed_in_costs', self.annuity_grid_feed_in_costs)
+#        print('self.annuity_total_levelized_costs_overall', self.annuity_total_levelized_costs_overall)
+        
         # Calculate Levelized Cost of Energy (Mischpreis bezogen auf kWh Strom und Wärme)
         self.levelized_cost_energy = self.annuity_total_levelized_costs_overall \
-                                    / (self.performance.load_energy_el_kWh_a + self.performance.heat_pump_energy_el_consumed_kWh_a)
+                                    / (self.performance.load_energy_el_kWh_a + self.performance.heat_pump_energy_el_consumed_kWh_a + self.performance.heat_pump_c_energy_el_consumed_kWh_a)
                                      
         #/ (self.performance.load_energy_el_kWh_a + self.performance.load_energy_heat_kWh_a)
                                      
