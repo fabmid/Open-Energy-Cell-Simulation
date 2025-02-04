@@ -1,11 +1,12 @@
 import pyomo.environ as pyo
 import pandas
+
 import data_loader
 from simulatable import Simulatable
 from optimizable import Optimizable
 
-class Load_Heat(Simulatable, Optimizable):
-    """Relevant methods to define the simulation heat load profile.
+class Load_Cold(Simulatable, Optimizable):
+    """Relevant methods to define the simulation cooling load profile.
 
     Parameters
     ----------
@@ -26,13 +27,12 @@ class Load_Heat(Simulatable, Optimizable):
 
         # Integrate load demand data_loader for csv load profile integration
         self.load_demand = data_loader.LoadDemand()
-        self.heating_load_data = None
-        self.hotwater_load_data = None
+        self.cooling_load_data = None
 
 
     def simulation_init(self):
         """Simulatable method.
-        Initializes list containers to store simulation results.
+        Initializs list containers to store simulation results.
 
         Parameters
         ----------
@@ -48,8 +48,7 @@ class Load_Heat(Simulatable, Optimizable):
 
 
     def simulation_calculate(self):
-        """Extracts power flow, flow temperature and volume flow rate of load profile
-        for each timestep in order to make class simulatable.
+        """Extract power flow of cooling load profile for each timestep in order to make class simulatable.
 
         Parameters
         ----------
@@ -65,29 +64,20 @@ class Load_Heat(Simulatable, Optimizable):
             - Correct algebraic sign is considered in pyomo Bus constraint!
         """
 
-        ## Heating load
-        if not isinstance(self.heating_load_data, pandas.core.series.Series):
-            self.heating_load_data = self.load_demand.get_heating_profile()
+        ## Cold load
+        if not isinstance(self.cooling_load_data, pandas.core.series.Series):
+            self.cooling_load_data = self.load_demand.get_cooling_profile()
 
-        # [kW] Get Load data and replicate it in case it is shorter than simulation time
-        self.heating_power = self.heating_load_data.values[self.time % len(self.heating_load_data)]
+        # [kW] Get Load data
+        self.power = self.cooling_load_data.values[self.time % len(self.cooling_load_data)]
 
-        ## Hot Water load
-        if not isinstance(self.hotwater_load_data, pandas.core.series.Series):
-            self.hotwater_load_data = self.load_demand.get_hotwater_profile()
-
-        # [kW] Get Load data and replicate it in case it is shorter than simulation time
-        self.hotwater_power = self.hotwater_load_data.values[self.time % len(self.hotwater_load_data)]
-
-        ## Combine heat power as sum of heating and hot drinkign water
-        self.power = self.heating_power + self.hotwater_power
         ## Save component status variables for all timesteps to list
         self.power_list.append(self.power)
 
 
     def optimization_get_block(self, model):
         """
-        Pyomo: MILP Heat Load block construction
+        Pyomo: MILP Cold Load block construction
 
         Parameters
         ----------
@@ -102,10 +92,10 @@ class Load_Heat(Simulatable, Optimizable):
         self.model = model
 
         ## Heat load block
-        self.model.blk_heat_load = pyo.Block()
+        self.model.blk_cold_load = pyo.Block()
 
         # Define parameters
-        self.model.blk_heat_load.power = pyo.Param(self.model.timeindex, initialize=self.data_prep(self.power_list))
+        self.model.blk_cold_load.power = pyo.Param(self.model.timeindex, initialize=self.data_prep(self.power_list))
 
 
     def optimization_save_results(self):
