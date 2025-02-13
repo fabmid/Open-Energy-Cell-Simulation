@@ -1,0 +1,9 @@
+{
+    "type": "economics",
+    "name": "Economic_generic",
+    "timeframe": 10.0,
+    "annual_percentage_rate": 0.05,
+    "price_escalation_nominal": 0.03,
+    "grid_electricty_cost": 0.26,
+    "grid_feed_in_tarif": 0.10
+}

@@ -1,0 +1,22 @@
+{
+    "type": "Electrolyzer_PEM",
+    "specification": "PEM electrolyzer",                                          
+    "partial_power_min": 0.0398, 
+    "efficiency_nominal": 0.6947,
+    "efficiency_el_a": 0.732371,
+    "efficiency_el_b": -0.236654,
+    "efficiency_el_c": -1.57696,
+    "efficiency_el_d": -29.832,
+    "efficiency_el_e": 0.0,
+    "efficiency_th_a": 0.0876978,
+    "efficiency_th_b": 0.329614,
+    "efficiency_th_c": -0.00676109,
+    "heating_value_kg": 33330.0,    
+    "heating_value_Nm": 3000.0,
+    "compressor_spec_compression_energy": 1044.0,      
+    "end_of_life_operation": 108000000,
+    "investment_costs_a": 5.6031,
+    "investment_costs_b": -0.276,
+    "investment_costs_c": 0.0,
+    "operation_maintenance_costs_share": 0.05
+}

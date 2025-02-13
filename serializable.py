@@ -9,10 +9,6 @@ class Serializable:
     file_path : `string`
         File path where to store/load json file.
 
-    Returns
-    -------
-    None : `None`
-
     Note
     ----
     - Example of how to save battery parameters
@@ -38,13 +34,6 @@ class Serializable:
         ----------
         file_path : `string`
             File path where to load json file from.
-
-        Returns
-        -------
-        None : `None`
-
-        Note
-        ----
         """
 
         # if no file_path is specified via load method it is taken from __init__method
@@ -66,13 +55,6 @@ class Serializable:
         ----------
         file_path : `string`
             File path where to store json file.
-
-        Returns
-        -------
-        None : `None`
-
-        Note
-        ----
         """
 
         # if no file_path is specified via load method it is taken from __init__method

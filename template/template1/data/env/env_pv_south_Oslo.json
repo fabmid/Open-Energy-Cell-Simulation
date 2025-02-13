@@ -1,0 +1,10 @@
+{
+    "type": "PV_east",
+    "specification": "PV",
+    "system_azimuth": 180.0,
+    "system_tilt": 40.0,
+    "location_latitude": 59.9139,
+    "location_longitude": 10.7522,
+    "location_timezone": "Europe/Oslo",
+    "location_altitude": 26.0           
+}

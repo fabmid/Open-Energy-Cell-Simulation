@@ -1,0 +1,18 @@
+{
+    "type": "Heat_storage",
+    "specification": "Heat Storage_Paradigma Aqua Expresso III",
+    "share_height_volume": 2.0406,
+    "share_diameter_volume": 0.8118,
+    "density_fluid": 1060,
+    "heat_capacity_fluid": 4182,
+    "heat_transfer_coef_storage": 0.4,
+    "temperature_heating_room": 293.15, 
+    "temperature_initial_perfectly_mixed": 313.15,
+    "temperature_minimum": 308.15,
+    "temperature_maximum": 373.15,
+    "temperature_target": 318.15,
+    "temperature_hysterese": 5.0,
+    "end_of_life": 946080000,
+    "investment_costs_specific": 0.01089,
+    "operation_maintenance_costs_share": 0.015
+}

@@ -1,44 +1,38 @@
 import pvlib
-import pyomo.environ as pyo
-import pandas as pd
-import numpy as np
-
-import data_loader
 from simulatable import Simulatable
 from serializable import Serializable
-from optimizable import Optimizable
 
-class Photovoltaic(Serializable, Simulatable, Optimizable):
+class Photovoltaic(Serializable, Simulatable):
     """Relevant methods for the calculation of photovoltaic performance.
 
     Parameters
     ----------
     timestep : `int`
         [s] Simulation timestep in seconds.
-    peak_power_arrays : `list of int`
-        [kWp] List of Installed PV peak power values.
+    peak_power : `int`
+        [Wp] Installed PV peak power.
+    controller_type : `string`
+        Type of charge controller PWM or MPPT.
     environment : `class`
-        To get access to solar irradiation, ambient temperature and windspeed data.
+        To get access to solar irradiation, ambient temperature and windspeed.
     file_name : `json`
         To load component parameters (optional).
 
     Note
     ----
-    - Pvlib ModelChain is used where different model approaches can be applied
-    - Json file is structured that PVWatts performance model can be applied
-    - Model includes DC and AC model computation based on PVWAtts methods
-    - PV system with different orientations can be modeled under the assumption of a single inverter connection
-    - PV surface orientation
-        - 1. Azimuth in degrees [°]. Panel azimuth from north (0°=north, 90°=east, 180°=south, 270°=west).
-        - 2. Inclination in degrees [°]. Panel tilt from horizontal.
-    - System location (tuble of floats)
-        - 1. System longitude in degrees [°]. Positive east of prime meridian, negative west of prime meridian.
-        - 2. System latitude in degrees [°]. Positive north of equator, negative south of equator.
+    - Photovoltaic with MPPT assumption or fixed voltage (PWM) is possible.
+    - Corresponding charge controller type mus be considered manually.
+    - Models are based on pvlib libary version 0.7.1.
+        - compare https://pvlib-python.readthedocs.io/en/stable/api.html
+    - Photovoltaic model parameters based on SAM libary.
+        - compare https://sam.nrel.gov/photovoltaic/pv-sub-page-2.html
+        - latest download available at: https://github.com/NREL/SAM/tree/develop/deploy/libraries
     """
 
     def __init__(self,
                  timestep,
-                 peak_power_arrays,
+                 peak_power,
+                 controller_type,
                  env,
                  file_path=None):
 
@@ -47,92 +41,62 @@ class Photovoltaic(Serializable, Simulatable, Optimizable):
             self.load(file_path)
         else:
             print('Attention: No json file for photovoltaic model specified')
-            self.type = "PV"                                                    # [] Type of json component
-            self.location_latitude = 52.5210                                    # [deg] Latitude degrees of considered system location
-            self.location_longitude = 13.3929                                   # [deg] Longitude degrees of considered system location
-            self.location_altitude = 36.0                                       # [m] Altitude of considered system location
-            self.location_tz = 'UTC'                                            # Considered timezone
-            self.module_type = 'glass_polymer'                                  # string - PV module type 'glass-glass' or glass-polymer'
-            self.arrays_number = 3                                              # int -  Number of PV arrays with different orientation
-            self.gamma_pdc = [-0.004,-0.004,-0.004]                             # list - [1/C] The temperature coefficient. Typically -0.002 to -0.005 (list length needs to equal arrays_number)
-            self.surface_tilt = [35,35,35]                                      # list - List of array tilt orientation (list length needs to equal arrays_number)
-            self.surface_azimuth = [90,180,270]                                 # list - List of array azimuth orientation (list length needs to equal arrays_number)
-            self.albedo = 0.25                                                  # [] Albedo assumption
-            self.transposition_model = 'isotropic'                              # string - default 'haydavies' – Passed to system.get_irradiance
-            self.solar_position_method = 'nrel_numpy'                           # string default 'nrel_numpy' – Passed to location.get_solarposition.
-            self.airmass_model = 'kastenyoung1989'                              # string - default 'kastenyoung1989' – Passed to location.get_airmass.
-            self.dc_model = 'pvwatts'                                           # string - Valid strings are ‘sapm’, ‘desoto’, ‘cec’, ‘pvsyst’, ‘pvwatts’
-            self.ac_model = 'pvwatts'                                           # string - Valid strings are ‘sandia’, ‘adr’, ‘pvwatts’
-            self.aoi_model = 'no_loss'                                          # string - Valid strings are ‘physical’, ‘ashrae’, ‘sapm’, ‘martin_ruiz’, ‘no_loss’
-            self.spectral_model = 'no_loss'                                     # string -  Valid strings are ‘sapm’, ‘first_solar’, ‘no_loss’
-            self.temperature_model = 'sapm'                                     # string - Temperature model used in pvlib
-            self.temperature_model_parameters = {'a': -3.47,
-                                                 'b': -0.0594,
-                                                 'deltaT': 3.0}                 # dict - Temperature model parameters
-            self.dc_ohmic_model = "no_loss"                                     # string - Valid strings are ‘dc_ohms_from_percent’, ‘no_loss’
-            self.losses_model = "pvwatts"                                       # string - Valid strings are 'no_loss or 'pvwatts'
-            self.losses_parameters = {'soiling': 2.0,
-                                      'shading': 3.0,
-                                      'snow': 0.0,
-                                      'mismatch': 2.0,
-                                      'wiring': 2.0,
-                                      'connections': 0.5,
-                                      'lid':0.0,
-                                      'nameplate_rating': 1.0,
-                                      'age': 0.0,
-                                      'availability':0.0}                       # dict - DC power losses in percentage
-            self.inverter_model ='pvwatts'                                      # string - Inverter model used in pvlib
-            self.inverter_efficiency_nom = 0.96                                 # [] Inverter nominal efficiency
-            self.inverter_oversizing_ratio = 1.30                               # [1] Inverter oversizign ration  defined as ratio of (P_nom Inverter / P_nom PV plant)
+
+            self.controller_method = "mppt"                                     # [-] Specification of photvoltaic charge controller (needed to call apropriate power method)
+            self.temperature_a = -3.47                                          # [0] Thermal model: Numeric parameter a of Sandia PV Array Performance Model
+            self.temperature_b = -0.0594                                        # [0] Thermal model: Numeric parameter b of Sandia PV Array Performance Model
+            self.temperature_deltaT = 3                                         # [0] Thermal model: Numeric parameter dT of Sandia PV Array Performance Model
+            self.params_name = "A10Green_Technology_A10J_S72_185"               # [-] Photovoltaic module specification
+            self.params_V_mp_ref = 36.72                                        # [V] Photovoltaic voltage at MPP
+            self.params_alpha_sc = 0.002253                                     # [A/C] Short-circuit current temperature coefficient
+            self.params_a_ref = 1.98482                                         # [V] Product of the usual diode ideality factor (n, unitless), number of cells in series (Ns), and cell thermal voltage at reference conditions
+            self.params_I_L_ref = 5.43568                                       # [A] The light-generated current (or photocurrent) at reference conditions
+            self.params_I_o_ref = 1.16164e-09                                   # [A] The dark or diode reverse saturation current at reference conditions
+            self.params_R_sh_ref = 298.424                                      # [Ohm] The shunt resistance at reference conditions
+            self.params_R_s = 0.311962                                          # [Ohm] The series resistance at reference conditions
+            self.params_pdc0 = 184.7016                                         # [W] Photovoltaic power of the modules at 1000 W/m2 and cell reference temperature
+            self.params_gamma_pdc = -0.005                                      # [1/C] The temperature coefficient. Typically -0.002 to -0.005
             self.degradation_pv = 1.58154e-10                                   # [1/s] Photovoltaic degradation per second: deg_yearly=0.5% --> 0.005 / (8760*3600)
             self.end_of_life_condition = 0.8                                    # [-] Component end of life condition
-            self.eco_no_systems = 1                                             # [1] The number of systems the peak power can be maximal allocated on, for sz3=5, sz4=128, sz5=72
-                                                                                #  At this point all house roofs are listed also those where finally no system is mounted, this is indeicated in self.systems_orientation
-            self.systems_orientation = {"east-west":5, "south":0, "no":0}       # [-] Orientation of PV systems in case of NH szenario (used in neighborhood class)
-            self.capex_p1 = 1661.7                                              # [€$/kWp] capex: Parameter1 (gradient) for specific capex definition
-            self.capex_p2 = -0.1210                                             # [€$/kWp] capex: Parameter2 (y-intercept) for specific capex definition
-            self.subsidy_percentage_capex = 0.19                                           # Economic model: [%] Capex subsidy
-            self.subsidy_limit = 1000000.0                                      # Economic model: [€/$] Max total capex subsidy
-            self.opex_fix_p1 = 0.02                                             # [€$/kWp/a] opex-fixed:  % of capex
-            self.opex_var = 0.0                                                 # [€$/kWh] opex-variable: Specific variable opex dependent on generated energy
-
-
+            self.investment_costs_a = -0.000006                                 # [] Economic function factor a
+            self.investment_costs_b = 2.6747                                    # [] Economic function factor b
+            self.operation_maintenance_costs_share = 0.05                       # [1] Share of omc costs of cc
+            
         # Integrate unique class instance identifier
         self.name = hex(id(self))
         # Integrate simulatable class for time indexing
         Simulatable.__init__(self)
-
         # Integrate environment class
         self.env = env
+        # Charge controller type
+        self.controller_type = controller_type
         # [s] Timestep
         self.timestep = timestep
 
         ## Basic parameters
-        # [kW] List of pv peak power of individual PV arrays
-        self.peak_power_arrays = peak_power_arrays
-        # [kW] Total installed PV peak power over all arrays
-        self.peak_power_nominal = sum(self.peak_power_arrays)
+        self.peak_power = peak_power
+        # [W] Current PV peak power dependent on aging
+        self.peak_power_current = self.peak_power
+        # [V] Battery voltage for PWM PV model
+        self.battery_voltage = 12
 
-        ## Aging model
-        # [kW] Initialize Current PV peak power dependent on aging
-        self.peak_power_current = self.peak_power_nominal
-        # [kW] Initialize End-of-Life condition of PV module
-        self.end_of_life = self.end_of_life_condition * self.peak_power_nominal
+        ## PV aging model
+        # [W] End-of-Life condition of PV module
+        self.end_of_life = self.end_of_life_condition * self.peak_power
 
         ## Economic model
-        # [kWp] Initialize Nominal power
-        self.size_nominal = self.peak_power_nominal
-        # Integrate data_loader for NH size distribution csv loading
-        self.nh_loader = data_loader.NeighborhoodData()
-        # Get the number of individual systems on which the peak power is installed
-        # if attribute is not specified in json, set it to 1
-        if not hasattr(self, 'eco_no_systems'):
-            self.eco_no_systems = 1
-
-
-    def simulation_init(self):
-        """Simulatable method.
-        Calulate all photovoltaic performance parameters by calling all
+        # [Wp] Nominal power
+        self.size_nominal = self.peak_power
+        # [$/Wp] Photovoltaic specific investment costs
+        self.investment_costs_specific = (self.investment_costs_a * self.size_nominal \
+                                         + self.investment_costs_b)
+        # [$/W] Electrolyzer specific operation and maintenance cost
+        self.operation_maintenance_costs_specific = self.operation_maintenance_costs_share \
+                                                    * self.investment_costs_specific
+                                                    
+    def start(self):
+        """Simulatable method, sets time=0 at start of simulation.   
+        Calulates all photovoltaic performance parameters by calling all
         methods based on pvlib.
 
         Parameters
@@ -141,7 +105,11 @@ class Photovoltaic(Serializable, Simulatable, Optimizable):
 
         Returns
         -------
-        None : `None`
+        temperature_cell : `float`
+            [K] Photovoltaic cell temperature, by calling method photovoltaic.temperature().
+        power_module : `float`
+            [W] Photvoltaic module power of specified module, by calling methods
+            photovoltaic.power_mppt() or photovoltaic_pwm().
 
         Note
         ----
@@ -150,28 +118,27 @@ class Photovoltaic(Serializable, Simulatable, Optimizable):
         - Method is equal to environment class, where all env data is loaded all in one.
         - Other paranmeters are caculated step by step in the method photovoltaic.calculate().
         """
+
+        # Calculate photovoltaic temperature
+        self.get_temperature()
+
+        # Calculate phovoltaic power dependent on controller type
+        if self.controller_type == 'mppt':
+            self.get_power_mppt()
+
+        elif self.controller_type == 'pwm':
+            pass
+        else:
+            print('Specify valid pv controller type!')
+
+
+    def end(self):
+        """Simulatable method, sets time=0 at end of simulation.    
+        """
         
-        ## List container to store simulation results for all timesteps
-        self.power_dc_list = list()
-        self.power_ac_list = list()
-        self.power_list = list()
-        self.temperature_list = list()
-        self.degradation_factor_list = list()
-        self.peak_power_current_list = list()
-        self.state_of_destruction_list = list()
-        self.replacement_list = list()
-
-        ## Call pv lib methods to calculate all timesteps in batch
-        self.get_location()
-        self.get_system()
-        self.run_model_chain()
-
-        # Get economic parameters
-        self.get_economic_parameters()
-
-
-    def simulation_calculate(self):
-        """Calculate and extracts all photovoltaic performance parameters from
+        
+    def calculate(self):
+        """Calculates and extracts all photovoltaic performance parameters from
         implemented methods.
 
         Parameters
@@ -180,8 +147,20 @@ class Photovoltaic(Serializable, Simulatable, Optimizable):
 
         Returns
         -------
-        None : `None`
-        
+        temperature : `float`
+            [K] Photovoltaic cell temperature, equals temperature_cell.
+        power : `float`
+            [W] Photvoltaic overall power of specified installed array specified
+            by parameter peak_power.
+        peak_power_current : `float`
+            [W] Photovoltaic current peak power assuming power degradation by
+            implemented method phovoltaic_aging()
+        state_of_destruction : `float`
+            [-] Phovoltaic state of destruction as fraction of current and
+            nominal peak power.
+        replacement : `float`
+            [s] Time of replacement in case state_of_destruction equals 1.
+
         Note
         ----
         - Method mainly extracts parameters by calling implemented methods:
@@ -189,180 +168,33 @@ class Photovoltaic(Serializable, Simulatable, Optimizable):
             - get_state_of_destruction()
         """
 
-        # Call Aging and State of Destruction functions
+        # Photovoltaic cell temperature
+        self.temperature = self.temperature_cell[self.time]
+
+        # PWM power calculation
+        if self.controller_type == 'pwm':
+            self.get_power_pwm()            
+            # Power calculation with aging
+            # Normalize power and multiplication with current peak power
+            self.power = (self.power_module / self.params_pdc0) * self.peak_power_current
+        
+        # MPPT power calculation    
+        elif self.controller_type == 'mppt':
+            # Power calculation with aging
+            # Normalize power and multiplication with current peak power
+            self.power = (self.power_module[self.time] / self.params_pdc0) * self.peak_power_current
+            
+        else:
+            print('Specify valid pv controller type!')
+            
+        # Aging and State of Destruction
         self.get_aging()
         self.get_state_of_destruction()
 
-        # Mean cell temperature of all PV arrays
-        self.temperature = self.temperature_mc[self.time]
-        # Total DC power of all arrays (inclduing degradation factor)
-        self.power_dc = self.power_dc_mc[self.time] * self.degradation_factor
-        # Total AC power of PV system (inclduing degradation factor)
-        self.power = self.power_ac_mc[self.time] * self.degradation_factor
 
-        ## Save component status variables for all timesteps to list
-        self.power_dc_list.append(self.power_dc)
-        self.power_list.append(self.power)
-        self.temperature_list.append(self.temperature)
-        self.degradation_factor_list.append(self.degradation_factor)
-        self.peak_power_current_list.append(self.peak_power_current)
-        self.state_of_destruction_list.append(self.state_of_destruction)
-        self.replacement_list.append(self.replacement)
-
-
-    def get_location(self):
-        """
-        Computes the latitude, longitude and timezone information of the pv system location.
-
-        Returns
-        -------
-        None : `None`
-
-        Note
-        ----
-        - https://pvlib-python.readthedocs.io/en/stable/reference/generated/pvlib.location.Location.html?highlight=location.location
-        """
-        
-        # Define Location object
-        self.location = pvlib.location.Location(latitude=self.location_latitude,
-                                                longitude=self.location_longitude,
-                                                tz=self.location_tz,
-                                                altitude=self.location_altitude)
-
-
-    def get_system(self):
-        """
-        Initializes a pvlib PVSystem object with the PV arrays and PV inverters.
-
-        Returns
-        -------
-        None : `None`
-
-        Note
-        ----
-        - https://pvlib-python.readthedocs.io/en/stable/reference/generated/pvlib.pvsystem.Array.html#pvlib.pvsystem.Array
-        """
-        
-        # PV array definition
-        self.module_parameters = list()
-        self.mount = list()
-        self.array = list()
-
-        for i in range(0, self.arrays_number):
-            # Define module parameters dict
-            self.module_parameters.append({'pdc0': self.peak_power_arrays[i],
-                                           'gamma_pdc': self.gamma_pdc[i]})
-
-            # Mount definition of each array
-            self.mount.append(pvlib.pvsystem.FixedMount(surface_tilt=self.system_tilt[i],
-                                                        surface_azimuth=self.system_azimuth[i]))
-            # Array definition of each array
-            self.array.append(pvlib.pvsystem.Array(mount=self.mount[i],
-                                                   albedo=self.albedo,
-                                                   module_type=self.module_type,
-                                                   module_parameters=self.module_parameters[i],
-                                                   temperature_model_parameters=self.temperature_model_parameters))
-
-        # Define PV inverter size (Oversizing can be considered)
-        self.inverter_parameters = {'pdc0': (sum(self.peak_power_arrays) / self.inverter_oversizing_ratio),
-                                    'eta_inv_nom': self.inverter_efficiency_nom}
-
-        # Initialize PV system
-        self.system = pvlib.pvsystem.PVSystem(arrays=self.array,
-                                              inverter_parameters=self.inverter_parameters,
-                                              losses_parameters=self.losses_parameters)
-
-
-    def run_model_chain(self):
-        """
-        Runs the pvlib modelchain to compute the initialized PVSystem.
-
-        Returns
-        -------
-        None : `None`
-
-        Note
-        ----
-        - https://pvlib-python.readthedocs.io/en/stable/reference/generated/pvlib.modelchain.ModelChain.html#pvlib.modelchain.ModelChain
-
-        """
-
-        # Initialize model chain
-        self.mc = pvlib.modelchain.ModelChain.with_pvwatts(system=self.system,
-                                                           location=self.location,
-                                                           transposition_model=self.transposition_model,
-                                                           solar_position_method=self.solar_position_method,
-                                                           airmass_model=self.airmass_model,
-                                                           dc_model=self.dc_model,
-                                                           ac_model=self.ac_model,
-                                                           aoi_model=self.aoi_model,
-                                                           spectral_model=self.spectral_model,
-                                                           temperature_model=self.temperature_model,
-                                                           dc_ohmic_model=self.dc_ohmic_model,
-                                                           losses_model=self.losses_model)
-
-        # Run mc model with solar environmental data
-        self.mc.run_model(self.env.data_solar)
-
-        # Extract main mc results
-        if self.arrays_number > 1:
-            self.temperature_mc = pd.concat(list(self.mc.results.cell_temperature), axis=1).mean(axis=1)
-            self.power_dc_mc = pd.concat(list(self.mc.results.dc), axis=1).sum(axis=1)
-
-        else:
-            self.temperature_mc = self.mc.results.cell_temperature
-            self.power_dc_mc = self.mc.results.dc
-
-        self.power_ac_mc = self.mc.results.ac
-        self.capacity_factor_ac = self.mc.results.ac / self.peak_power_nominal
-
-
-    def optimization_get_block(self, model):
-        """
-        Pyomo: MILP PV block construction
-
-        Parameters
-        ----------
-        model : pyomo.model class instance (defined in optimizabe.py)
-
-        Returns
-        -------
-        None : `None`
-        """
-        
-        # Central pyomo model
-        self.model = model
-
-        ## PV block
-        self.model.blk_pv = pyo.Block()
-
-        # In case capacity is NOT 0, normal calculation
-        if self.peak_power_nominal != 0:
-            # Define parameters
-            self.model.blk_pv.power = pyo.Param(self.model.timeindex, initialize=self.data_prep(self.power_list))
-        # Incase capacity is 0 - no variables - only params=0!
-        else:
-            self.model.blk_pv.power = pyo.Param(self.model.timeindex, initialize=0)
-
-
-    def optimization_save_results(self):
-        """
-        Method to store optimization results
-
-        Parameters
-        ----------
-        None : `None`
-
-        Returns
-        -------
-        None : `None`
-        """
-        
-        pass
-
-
-    def get_aging(self):
-        """Calculates photovoltaic power degradation and current peak power in Watt [W] assuming constant power degradation.
+    def get_temperature(self):
+        """Calculates photovoltaic cell temperature with the Sandia PV Array
+        Performance Model integrated in pvlib.
 
         Parameters
         ----------
@@ -370,19 +202,178 @@ class Photovoltaic(Serializable, Simulatable, Optimizable):
 
         Returns
         -------
-        None : `None`
+        temperature_cell : `float`
+            [K] Photovoltaic cell temperature (ATTENTION: not C as specified in pvlib)
+
+        Note
+        ----
+        - The Sandia PV Array Performance Model is based on [1]_.
+        - pvlib.temperature.sapm_cell is called with
+            - pvlib.temperature.sapm_cell(poa_global, temp_air, wind_speed, a,
+                                          b, deltaT, irrad_ref=1000)
+            - compare, https://pvlib-python.readthedocs.io/en/stable/generated/pvlib.temperature.sapm_cell.html
+        - For numerical values of different module configurations, call
+            - pvlib.temperature.TEMPERATURE_MODEL_PARAMETERS
+
+        .. [1]	King, D. et al, 2004, “Sandia Photovoltaic Array Performance Model”,
+                      SAND Report 3535, Sandia National Laboratories, Albuquerque, NM.
+        """
+
+        self.temperature_cell = pvlib.temperature.sapm_cell(poa_global=self.env.power ,
+                                                            wind_speed=self.env.windspeed,
+                                                            temp_air=self.env.temperature_ambient,
+                                                            a=self.temperature_a,
+                                                            b=self.temperature_b,
+                                                            deltaT=self.temperature_deltaT)
+
+
+    def get_power_pwm(self):
+        """Calculates the photovoltaic power at given voltage through the VI curve
+        determination with the single diode model and gets parameter for single diode model.
+
+        Parameters
+        ----------
+        None : `-`
+
+        Returns
+        -------
+        photocurrent : `float`
+            [A] Light-generated current in amperes
+        saturation_current : `float`
+            [A] Diode saturation curent in amperes
+        resistance_series : `float`
+            [Ohm] Series resistance in ohms
+        resistance_shunt : `float`
+            [Ohm] Shunt resistance in ohms
+        nNsVth : `float`
+            (numeric) The product of the usual diode ideality factor (n, unitless),
+            number of cells in series (Ns),
+            and cell thermal voltage at specified effective irradiance and cell temperature.
+        current : `np.ndarray/scalar`
+            [A] Photovoltaic current in amperes at given voltage level.
+
+        Note
+        ----
+        - To construct VI curve to determine power at given voltage level.
+            - Is based on model by Jain et al. [2]_.
+            - pvlib.pvsystem.i_from_v(resistance_shunt, resistance_series, nNsVth, \
+            voltage, saturation_current, photocurrent, method='lambertw')
+            - https://pvlib-python.readthedocs.io/en/stable/generated/pvlib.pvsystem.i_from_v.html#pvlib-pvsystem-i-from-v
+        - Get values to construct single diode model.
+            - Is based on five parameter model, by De Soto et al. described in [3]_.
+            - Five values for the single diode equation at effective irradiance and
+              cell temperature can be obtained by calling calcparams_desoto.
+            - pvlib.pvsystem.calcparams_desoto(effective_irradiance, temp_cell, \
+            alpha_sc, a_ref, I_L_ref, I_o_ref, R_sh_ref, R_s, EgRef=1.121, dEgdT=-0.0002677, irrad_ref=1000, temp_ref=25)
+            - https://pvlib-python.readthedocs.io/en/stable/generated/pvlib.pvsystem.calcparams_desoto.html
+            - results are returend as tubple of above listed returns.
+        - To access pvlib module database and get parameters
+            - modules_list = pvlib.pvsystem.retrieve_sam('CECMod') #'SandiaMod'
+            - module = modules_list["NuvoSun_FL0912_100"]
+        - Further references are [4]_ and [5]_.
+
+        .. [2] A. Jain, A. Kapoor, “Exact analytical solutions of the parameters
+               of real solar cells using Lambert W-function”, Solar Energy Materials
+               and Solar Cells, 81 (2004) 269-277.
+        .. [3] W. De Soto et al., “Improvement and validation of a model
+               for photovoltaic array performance”, Solar Energy, vol 80, pp. 78-88, 2006.
+        .. [4] System Advisor Model web page. https://sam.nrel.gov.
+        .. [5] A. Dobos, “An Improved Coefficient Calculator for the California
+               Energy Commission 6 Parameter Photovoltaic Module Model”,
+               Journal of Solar Energy Engineering, vol 134, 2012.
+        """
+
+        # Call five parameter model
+        [self.I_ph, self.I_sat, self.R_s, self.R_sh, self.nNsVth] = \
+        pvlib.pvsystem.calcparams_desoto(effective_irradiance=self.env.power[self.time],
+                                        temp_cell=(self.temperature-273.15),
+                                        alpha_sc=self.params_alpha_sc,
+                                        a_ref=self.params_a_ref,
+                                        I_L_ref=self.params_I_L_ref,
+                                        I_o_ref=self.params_I_o_ref,
+                                        R_sh_ref=self.params_R_sh_ref,
+                                        R_s=self.params_R_s,
+                                        EgRef=1.121,
+                                        dEgdT=-0.0002677,
+                                        irrad_ref=1000,
+                                        temp_ref=25)
+
+        # Define photovoltaic voltage
+        self.singlediode_voltage = self.battery_voltage #self.params_V_mp_ref
+        # Call single diode model
+        self.singlediode_current = pvlib.pvsystem.i_from_v(resistance_shunt=self.params_R_sh_ref,
+                                                          resistance_series=self.params_R_s,
+                                                          nNsVth=self.nNsVth,
+                                                          voltage=self.singlediode_voltage,
+                                                          saturation_current=self.I_sat,
+                                                          photocurrent=self.I_ph,
+                                                          method='lambertw')
+
+        # Set negative current values (in case of no sun irradiance) to zero
+        if self.singlediode_current < 0:
+            self.singlediode_current = 0
+        
+        #self.singlediode_current[self.singlediode_current < 0] = 0
+        
+        # Calcuate power from I and V values
+        self.singlediode_power = self.singlediode_current * self.singlediode_voltage
+
+        self.power_module = self.singlediode_power # self.single_diode['p_mp']#self.single_diode_mpp['p_mp']#
+
+
+    def get_power_mppt(self):
+        """Calculates the Photovoltaic Maximum Power.
+
+        Parameters
+        ----------
+        None : `-`
+
+        Returns
+        -------
+        power : `float`
+            [W] DC photovoltaic mpp power in watts.
+
+        Note
+        ----
+        - Model is based on NREL’s PVWatts DC power model [6]_.
+            - pvlib.pvsystem.pvwatts_dc(g_poa_effective, temp_cell, pdc0, gamma_pdc, temp_ref=25.0).
+            - https://pvlib-python.readthedocs.io/en/stable/generated/pvlib.pvsystem.pvwatts_dc.html.
+
+        .. [6] A. P. Dobos, “PVWatts Version 5 Manual” http://pvwatts.nrel.gov/downloads/pvwattsv5.pdf (2014).
+        
+        
+        Could be updated according to:
+            https://pvlib-python.readthedocs.io/en/stable/generated/pvlib.pvsystem.pvwatts_dc.html#pvlib.pvsystem.pvwatts_dc
+            
+        """
+
+        self.power_module = pvlib.pvsystem.pvwatts_dc(g_poa_effective=self.env.power,
+                                                      temp_cell=(self.temperature_cell-273.15),
+                                                      pdc0=self.params_pdc0,
+                                                      gamma_pdc=self.params_gamma_pdc)
+
+
+    def get_aging(self):
+        """Calculates photovoltaic power degradation and current peak power in
+        Watt [W] assuming aonstat power degradation.
+
+        Parameters
+        ----------
+        None : `-`
+
+        Returns
+        -------
+        peak_power_current : `float`
+            [Wp] Photovoltaic current peak power in watt peak.
         """
 
         # PV power degradation
         self.peak_power_current = (1 - (self.degradation_pv * self.timestep)) * self.peak_power_current
 
-        # Calculate degradation factor
-        # Gives degradation not per timestep but for each timestep in comparision to nominal starting power)
-        self.degradation_factor = (self.peak_power_current / self.peak_power_nominal)
-
 
     def get_state_of_destruction(self):
-        """Calculate the photovoltaic state of destruction (SoD) and time of component replacement according to end of life criteria.
+        """Calculates the photovoltaic state of destruction (SoD) and time of
+        component replacement according to end of life criteria.
 
         Parameters
         ----------
@@ -390,7 +381,10 @@ class Photovoltaic(Serializable, Simulatable, Optimizable):
 
         Returns
         -------
-        None : `None`
+        state_of_destruction : `float`
+            [1] Photovoltaic State of destruction with SoD=1 representing a broken component.
+        replacement : `int`
+            [s] Time of photovoltaic component replacement in seconds.
 
         Note
         ----
@@ -399,55 +393,16 @@ class Photovoltaic(Serializable, Simulatable, Optimizable):
         """
 
         # State of destruction (in case no component installed SoD=0)
-        if self.peak_power_nominal != 0:
-            self.state_of_destruction = (self.peak_power_nominal - self.peak_power_current) \
-                                        / (self.peak_power_nominal -  self.end_of_life)
+        if self.peak_power != 0:
+            self.state_of_destruction = (self.peak_power - self.peak_power_current) \
+                                        / (self.peak_power -  self.end_of_life)
         else:
             self.state_of_destruction = 0
-
+    
         # Store time index in list replacement in case end of life criteria is met
         if self.state_of_destruction >= 1:
             self.replacement = self.time
             self.state_of_destruction = 0
-            self.peak_power_current = self.peak_power_nominal
+            self.peak_power_current = self.peak_power
         else:
             self.replacement = 0
-
-
-
-    def get_economic_parameters(self):
-        """Calculate the component specific capex and fixed opex for a neighborhood scenario where multiple systems are installed.
-
-        Parameters
-        ----------
-        None : `-`
-
-        Returns
-        -------
-        None : `None`
-
-        Note
-        ----
-        """
-        # Calculate specific cost only if installed capacity is not 0!
-        if self.peak_power_nominal != 0:
-            # For single building scenarios - SB
-            if self.eco_no_systems == 1:
-                # [€$/kWp] Initialize specific capex
-                self.capex_specific = (self.capex_p1 * (self.size_nominal/self.eco_no_systems)**self.capex_p2)
-                # [€$/kWp] Initialize specific fixed opex
-                self.opex_fix_specific = (self.opex_fix_p1 * self.capex_specific)
-            # For neigborhood scenarios - NH
-            else:
-                # Get size distribution of PV systems in neighborhood
-                self.size_nominal_distribution = self.nh_loader.get_pv_size_distribution()
-                # Calculate specific capex distribution for different PV sizes
-                self.capex_specific_distribution = [(self.capex_p1 * (self.size_nominal*j)**self.capex_p2) if j>0 else 0 for j in self.size_nominal_distribution]
-                # [€$/kWp] Get NH specific capex as mean value of distribution
-                self.capex_specific =  np.mean([i for i in self.capex_specific_distribution if i != 0])
-                # [€$/kWp] Initialize specific fixed opex
-                self.opex_fix_specific = (self.opex_fix_p1 * self.capex_specific)
-        # No capex/opex fix in case of no installation
-        else:
-            self.capex_specific = 0
-            self.opex_fix_specific = 0

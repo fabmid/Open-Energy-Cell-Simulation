@@ -1,0 +1,10 @@
+{
+    "type": "MPPT_PV",
+    "specification": "MPPT_Solaredge_370_35V",
+    "efficiency_nominal": 0.995,
+    "voltage_loss": -0.004747,
+    "resistance_loss": 0.013295,
+    "power_self_consumption": 0.001553,
+    "end_of_life": 788400000,
+    "investment_costs_specific": 0.0
+}
