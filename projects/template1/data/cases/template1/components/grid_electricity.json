@@ -1,0 +1,13 @@
+{
+    "name": "Grid_electricity_sz1_sfh",
+    "power_max": 100.0,
+    "cost_dynamic": "False",
+    "cost_buy": 37.3,
+    "cost_sell_10": 8.2,
+    "cost_sell_40": 7.1, 
+    "cost_sell_100": 5.8, 
+    "capex_p1": 0.0,
+    "subsidy_percentage_capex": 0.0,
+    "subsidy_limit": 0.0,
+    "opex_fix_p1": 169.7
+}

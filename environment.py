@@ -8,72 +8,39 @@ from simulatable import Simulatable
 from serializable import Serializable
 
 class Environment(Serializable, Simulatable):
-    """Relevant methods for the calculation of the global irradiation and sun position.
+    """Relevant methods for the loading and formatting of data for irradiation (Photovoltaic model) and wind speed (Wind turbine model).
 
     Parameters
     ----------
     timestep : `int`
         [s] Simulation timestep in seconds.
-    system_orientation : `floats`
-        [°] Tuble of floats definiing the system oriantation with system azimuth and inclination.
-    system_location : `floats`
-        [°] Tuble of floats defining the system location coordinates with longitude and latitude.
+
+    Returns
+    -------
+    None : `None`
 
     Note
     ----
-    - System orientation (tuble of floats)
-        - 1. tuble entry system azimuth in degrees [°]. Panel azimuth from north (0°=north, 90°=east, 180°=south, 270°=west).
-        - 2. tuble entry system inclination in degrees [°]. Panel tilt from horizontal.
-    - System location (tuble of floats)
-        - 1. tuble entry system longitude in degrees [°]. Positive east of prime meridian, negative west of prime meridian.
-        - 2. tuble entry system latitude in degrees [°]. Positive north of equator, negative south of equator.
     """
 
     def __init__(self,
-                 timestep,
-                 file_path=None):
+                 timestep):
 
-        # Read component parameters from json file
-        if file_path:
-            self.load(file_path)
-        else:
-            print('Attention: No json file for environment model specified')
-            self.system_azimuth = 180
-            self.system_tilt = 45
-            self.location_latitude = 52.5210
-            self.location_longitude = 13.3929
-            self.location_timezone = 'Europe/Berlin'
-            self.location_altitude = 36
-            
         # Integrate simulatable class for time indexing
         Simulatable.__init__(self)
-        
+
         ## Data loader
         # Integrate irradiation and temperature/wind data loader for photovoltaic and windtubrine model
         self.meteo_irradiation = data_loader.MeteoIrradiation()
         self.meteo_weather = data_loader.MeteoWeather()
-        
+
         # [s] Timestep
         self.timestep = timestep
 
-        # PV module azimuth and inclination angle:
-        # PV azimuth in degrees [°] (0°=north, 90°=east, 180°=south, 270°=west)
-        self.system_azimuth = self.system_azimuth
-        # PV inclination in degrees [°]
-        self.system_tilt = self.system_tilt
-        
-        # System location        
-        self.system_location = pvlib.location.Location(latitude=self.location_latitude,
-                                                       longitude=self.location_longitude,
-                                                       tz=self.location_timezone,
-                                                       altitude=self.location_altitude)
-    
 
-    def start(self):
-        """Simulatable method. 
-        Loads and calculates all relevant environment data, including total, \
-        beam, sky, ground irradiation (pvlib), temperature in [K] and windspeed data in [m/s] \
-        sun position (pvlib) and angle of inclination (pvlib).
+    def simulation_init(self):
+        """Simulatable method.
+        Loads all relevant environment data, including total, beam, sky, ground irradiation (pvlib), temperature in [K] and windspeed data in [m/s].
 
         Parameters
         ----------
@@ -81,107 +48,221 @@ class Environment(Serializable, Simulatable):
 
         Returns
         -------
-        sun_position_pvlib : `floats`
-            [°] Tuble of floats, defining the sun position with its elevation and azimuth angle.
-        sun_aoi_pvlib : `floats`
-            [°] Angle of incidence of the solar vector on the module surface.
-        sun_irradiance_pvlib : `floats`
-            [W/m2] Plane on array irradiation (total, beam, sky, ground).
-        power : `float`
-            [Wh] Total plane on array irradiation.
 
         Note
         ----
-        - All models are based on pvlib libary version 0.7.1.        
-        - Solar position calculator (pvlib)
-            - pvlib.solarposition.get_solarposition(time, latitude, longitude, \
-            altitude=None, pressure=None, method='nrel_numpy', temperature=12, kwargs)
-            - https://pvlib-python.readthedocs.io/en/stable/generated/pvlib.solarposition.get_solarposition.html
-            - Further details, compare [1]_, [2]_ and [3]_.            
-        - Angle of incident calculator (pvlib)
-            - The angle of incidence of the solar vector and the module surface normal.
-            - pvlib.irradiance.aoi(surface_tilt, surface_azimuth, solar_zenith, solar_azimuth)
-            - https://pvlib-python.readthedocs.io/en/stable/generated/pvlib.irradiance.aoi.html
-        - Total, beam, sky diffuse and ground reflected in-plane irradiance
-            - Calculated using the specified sky diffuse irradiance model (pvlib).
-            - pvlib.irradiance.get_total_irradiance(surface_tilt, surface_azimuth, \
-            solar_zenith, solar_azimuth, dni, ghi, dhi, dni_extra=None, airmass=None, \
-            albedo=0.25, surface_type=None, model='isotropic', model_perez='allsitescomposite1990', kwargs)
-            - https://pvlib-python.readthedocs.io/en/stable/generated/pvlib.irradiance.get_total_irradiance.html
-        - Class data_loader 
+        - Ambient tempertaure for pvlib calculation is handeled in °C, for other components as battery it is handeled in K.
+        - Class data_loader
             - Integrated and its method MeteoIrradiation() and MeteoWeather() to integrate csv weather data.
             - This method is called externally before the central method simulate() \
-            of the class simulation is called.       
-            
-        .. [1] I. Reda and A. Andreas, Solar position algorithm for solar
-           radiation applications. Solar Energy, vol. 76, no. 5, pp. 577-589, 2004.
-        .. [2] I. Reda and A. Andreas, Corrigendum to Solar position algorithm
-           for solar radiation applications. Solar Energy, vol. 81, no. 6, p. 838, 2007.
-        .. [3]	NREL SPA code: http://rredc.nrel.gov/solar/codesandalgorithms/spa/
+            of the class simulation is called.
         """
+
+        ## List container to store results for all timesteps
+        self.timeindex_list = list()
+        self.temperature_ambient_list = list()
+        self.windspeed_list = list()
+        self.air_pressure_list = list()
+        self.sun_ghi_list = list()
+        self.sun_dhi_list = list()
+        self.sun_bni_list = list()
 
         ## Time indexing
         # Extract environment values with data_loader from csv file
         self.time_step = self.meteo_irradiation.get_time()
         # List comprehension to get first timeindex of timestep
-        self.time_index = [datetime.strptime(i.split('/')[0], '%Y-%m-%dT%H:%M:%S.%f') for i in self.time_step]
-        
-        ## Wind turbine model
+        self.timeindex = [datetime.strptime(i.split('/')[0], '%Y-%m-%dT%H:%M:%S.%f') for i in self.time_step]
+
+        ## Environmental data
         # Windspeed, temperature, pressure and roughness data
-        self.windspeed = pd.Series(self.meteo_weather.get_wind_speed().values, index=self.time_index)
-        self.temperature_ambient = pd.Series(self.meteo_weather.get_temperature().values, index=self.time_index)
-        self.air_pressure = pd.Series(self.meteo_weather.get_air_pressure().values, index=self.time_index)*100
+        self.windspeed = pd.Series(self.meteo_weather.get_wind_speed().values, index=self.timeindex)
+        self.temperature_ambient = pd.Series(self.meteo_weather.get_temperature().values, index=self.timeindex)
+        self.air_pressure = pd.Series(self.meteo_weather.get_air_pressure().values, index=self.timeindex)*100
+
+        ## Pvlib: Photovoltaic model: Irradiation, temperature, wind data
+        # Irradiation: convert Irradiation [Wh] to irradiance [W]
+        self.sun_bni = pd.Series((self.meteo_irradiation.get_bni().values) / (self.timestep/3600), index=self.timeindex)
+        self.sun_ghi = pd.Series((self.meteo_irradiation.get_ghi().values) / (self.timestep/3600), index=self.timeindex)
+        self.sun_dhi = pd.Series((self.meteo_irradiation.get_dhi().values) / (self.timestep/3600), index=self.timeindex)
+
+        # Create df with solar input data (format necessary for pvlib)
+        # Ambient temperature for pvlib in °C
+        self.data_solar = pd.DataFrame({'ghi':self.sun_ghi,
+                                        'dhi':self.sun_dhi,
+                                        'dni':self.sun_bni,
+                                        'temp_air':self.temperature_ambient-273,
+                                        'wind_speed':self.windspeed
+                                        })
+
+
+        ## Windpowerlib: Windturbine model: Create Wind data DataFrame multiindex for WindTurbine
         # Fixed roughness length as long as datasource does not provide data
         self.roughness_length = np.ones(len(self.windspeed))*0.1
-        
-        ## Sun Model: Irradiation, temperature, wind data       
-        # Irradiation: convert Irradiation [Wh] to irradiance [W]
-        self.sun_bni = pd.Series((self.meteo_irradiation.get_bni().values) / (self.timestep/3600), index=self.time_index)
-        self.sun_ghi = pd.Series((self.meteo_irradiation.get_ghi().values) / (self.timestep/3600), index=self.time_index)
-        self.sun_dhi = pd.Series((self.meteo_irradiation.get_dhi().values) / (self.timestep/3600), index=self.time_index)
 
-        # pvlib: Calculate sun position
-        self.sun_position_pvlib = pvlib.solarposition.get_solarposition(time=self.time_index,
-                                                                        latitude=self.system_location.latitude,
-                                                                        longitude=self.system_location.longitude,
-                                                                        altitude=self.system_location.altitude,
-                                                                        pressure=None,
-                                                                        method='nrel_numpy',
-                                                                        temperature=12)
-
-        # pvlib: Calculate sun angle of incident
-        self.sun_aoi_pvlib = pvlib.irradiance.aoi(surface_tilt=self.system_tilt,
-                                                  surface_azimuth=self.system_azimuth,
-                                                  solar_zenith=self.sun_position_pvlib['apparent_zenith'],
-                                                  solar_azimuth=self.sun_position_pvlib['azimuth'])
-
-        # pvlib: Calculate plane of array irradiance (total, beam, sky, ground)
-        self.sun_irradiance_pvlib = pvlib.irradiance.get_total_irradiance(surface_tilt=self.system_tilt,
-                                                                          surface_azimuth=self.system_azimuth,
-                                                                          solar_zenith=self.sun_position_pvlib['apparent_zenith'],
-                                                                          solar_azimuth=self.sun_position_pvlib['azimuth'],
-                                                                          dni=self.sun_bni, 
-                                                                          ghi=self.sun_ghi, 
-                                                                          dhi=self.sun_dhi,
-                                                                          dni_extra=None,
-                                                                          airmass=None,
-                                                                          albedo=0.25,
-                                                                          surface_type=None,
-                                                                          model='isotropic')
-        # extract global plane of array irradiance
-        self.power = self.sun_irradiance_pvlib['poa_global']
-        self.power_poa_direct = self.sun_irradiance_pvlib['poa_direct']
-        self.power_poa_diffuse = self.sun_irradiance_pvlib['poa_sky_diffuse']
-        
-        ## Create Wind data DataFrame multiindex for WindTurbine
         # Needs to include wind_speed, temperature, pressure and roughness_length at given heights
-        arrays = [['wind_speed', 'temperature', 'pressure', 'roughness_length'], 
-                  [10, 2, 0,0]]
+        arrays = [['wind_speed', 'temperature', 'pressure', 'roughness_length'],
+                  [10, 2, 0, 0]]
         index=pd.MultiIndex.from_arrays(arrays, names=('name', 'value'))
-        
-        self.wind_data = pd.DataFrame({index[0]: self.windspeed, 
+
+        self.wind_data = pd.DataFrame({index[0]: self.windspeed,
                                        index[1]: self.temperature_ambient,
                                        index[2]: self.air_pressure,
                                        index[3]: self.roughness_length}
                                       )
-        
+
+
+    def simulation_calculate(self):
+        """Simulatable method.
+
+        Parameters
+        ----------
+        None : `None`
+
+        Returns
+        -------
+        None : `None`
+
+        Note
+        ----
+        """
+
+        ## Save component status variables for all timesteps to list
+        # Time index
+        self.timeindex_list.append(self.timeindex[self.time])
+        self.temperature_ambient_list.append(self.temperature_ambient[self.time])
+        self.air_pressure_list.append(self.air_pressure[self.time])
+        self.windspeed_list.append(self.windspeed[self.time])
+        self.sun_ghi_list.append(self.sun_ghi[self.time])
+        self.sun_dhi_list.append(self.sun_dhi[self.time])
+        self.sun_bni_list.append(self.sun_bni[self.time])
+
+
+
+class Environment_DWD(Serializable, Simulatable):
+    """Relevant methods for the loading and formatting of data for irradiation (Photovoltaic model) using DWD data source.
+
+    Parameters
+    ----------
+    timestep : `int`
+        [s] Simulation timestep in seconds.
+
+    Returns
+    -------
+    None : `None`
+
+    Note
+    ----
+    - DWD data needs to be first transfered from txt to csv and column seperator changed from ',' to ';'.
+    """
+
+    def __init__(self,
+                 timestep):
+
+        # Integrate simulatable class for time indexing
+        Simulatable.__init__(self)
+
+        ## Data loader
+        # Integrate irradiation and temperature/wind data loader for photovoltaic and windtubrine model
+        self.DWD_irradiation = data_loader.DWDIrradiation()
+        self.DWD_weather = data_loader.DWDWeather()
+
+        # [s] Timestep
+        self.timestep = timestep
+
+
+    def simulation_init(self):
+        """Simulatable method.
+        Load all relevant environment data, including global an diffuse irradiation.
+
+        Parameters
+        ----------
+        None : `None`
+
+        Returns
+        -------
+        None : `None`
+
+        Note
+        ----
+        - Ambient tempertaure for pvlib calculation is handeled in °C, for other components as battery it is handeled in K.
+        - Class data_loader
+            - Integrated and its method DWDIrradiation() and DWDWeather() to integrate csv weather data.
+            - This method is called externally before the central method simulate() \
+            of the class simulation is called.
+        """
+
+        ## List container to store results for all timesteps
+        self.timeindex_list = list()
+        self.temperature_ambient_list = list()
+        self.windspeed_list = list()
+        self.air_pressure_list = list()
+        self.sun_ghi_list = list()
+        self.sun_dhi_list = list()
+        self.sun_bni_list = list()
+        self.sun_zenith_list = list()
+
+        ## Time indexing
+        # Extract environment values with data_loader from csv file
+        self.time_step = self.DWD_irradiation.get_time()
+        # List comprehension to get first timeindex of timestep
+        self.timeindex = [datetime.strptime(str(i), '%Y%m%d%H') for i in self.time_step]
+
+        # Extract environment values with data_loader from csv file
+        # Windspeed in [m/s] at 10m height
+        self.windspeed = pd.Series(self.DWD_weather.get_wind_speed().values, index=self.timeindex)
+        # Ambient temperature in [°C] at 2m height
+        self.temperature_ambient = pd.Series(self.DWD_weather.get_temperature().values, index=self.timeindex)
+        # Air pressure transfer from hPa to Pa
+        self.air_pressure = pd.Series(self.DWD_weather.get_air_pressure().values, index=self.timeindex) * 100
+
+        # Irradiation in [Wh]: convert Irradiation [Wh] to irradiance [W]
+        self.sun_ghi = pd.Series((self.DWD_irradiation.get_ghi().values) / (self.timestep/3600), index=self.timeindex)
+        self.sun_dhi = pd.Series((self.DWD_irradiation.get_dhi().values) / (self.timestep/3600), index=self.timeindex)
+        self.sun_zenith = pd.Series((self.DWD_irradiation.get_zenith().values), index=self.timeindex)
+
+        # Calculation of dni [Wh]
+        self.sun_bni = pvlib.irradiance.dirint(ghi=self.sun_ghi,
+                                               solar_zenith=self.sun_zenith,
+                                                times=pd.DatetimeIndex(self.timeindex),
+                                                pressure=self.air_pressure,
+                                                use_delta_kt_prime=True,
+                                                temp_dew=None,
+                                                min_cos_zenith=0.065,
+                                                max_zenith=87)
+        # Replace nan with 0
+        self.sun_bni = self.sun_bni.replace(to_replace = np.nan, value = 0)
+
+        # Create df with solar input data (format necessary for pvlib)
+        # Ambient temperature for pvlib in °C
+        self.data_solar = pd.DataFrame({'ghi':self.sun_ghi,
+                                        'dhi':self.sun_dhi,
+                                        'dni':self.sun_bni,
+                                        'temp_air':self.temperature_ambient,
+                                        'wind_speed':self.windspeed
+                                        })
+
+    def simulation_calculate(self):
+        """Simulatable method.
+
+        Parameters
+        ----------
+        None : `None`
+
+        Returns
+        -------
+        None : `None`
+
+        Note
+        ----
+        """
+
+        ## Save component status variables for all timesteps to list
+        # Time index
+        self.timeindex_list.append(self.timeindex[self.time])
+        self.temperature_ambient_list.append(self.temperature_ambient[self.time])
+        self.windspeed_list.append(self.windspeed[self.time])
+        self.air_pressure_list.append(self.air_pressure[self.time])
+        self.sun_ghi_list.append(self.sun_ghi[self.time])
+        self.sun_dhi_list.append(self.sun_dhi[self.time])
+        self.sun_bni_list.append(self.sun_bni[self.time])
+        self.sun_zenith_list.append(self.sun_zenith[self.time])
